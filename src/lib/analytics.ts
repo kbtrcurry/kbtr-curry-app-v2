@@ -31,6 +31,14 @@ export function useClosedSessions() {
   return useQuery({ queryKey: ['analytics', 'sessions'], queryFn: fetchClosedSessions, staleTime: 60_000 })
 }
 
+export type SessionPatch = Partial<
+  Pick<ClosedSession, 'groups' | 'people' | 'reserved_people' | 'rent' | 'other_cost' | 'memo'>
+>
+export async function updateSalesSession(id: string, patch: SessionPatch): Promise<void> {
+  const { error } = await supabase.from('sales_sessions').update(patch).eq('id', id)
+  if (error) throw error
+}
+
 export type ReceiptLineRow = {
   session_id: string
   menu_id: string | null
@@ -64,6 +72,72 @@ export function salesBySession(lines: ReceiptLineRow[]): Record<string, number> 
     map[l.session_id] = (map[l.session_id] ?? 0) + l.qty * l.unit_price
   }
   return map
+}
+
+// ---------- 営業履歴の編集・削除 ----------
+
+// セッション本体を削除する（紐づく仕訳・レシート・レシート明細も連鎖削除）
+export async function deleteSessionCascade(sessionId: string): Promise<void> {
+  const { error: jeErr } = await supabase.from('journal_entries').delete().eq('source_id', sessionId)
+  if (jeErr) throw jeErr
+
+  const { data: receiptRows, error: rErr } = await supabase
+    .from('receipts')
+    .select('id')
+    .eq('session_id', sessionId)
+  if (rErr) throw rErr
+  const receiptIds = (receiptRows ?? []).map((r) => r.id)
+  if (receiptIds.length) {
+    const { error: delRErr } = await supabase.from('receipts').delete().in('id', receiptIds)
+    if (delRErr) throw delRErr
+  }
+
+  const { error: sErr } = await supabase.from('sales_sessions').delete().eq('id', sessionId)
+  if (sErr) throw sErr
+}
+
+export type EditableLine = { name: string; qty: number; unitPrice: number }
+
+// その日の会計内容(レシート・明細)を1件の修正レシートに作り直す。
+// session側の他項目(場所代・組数・メモ等)には触れない。
+export async function replaceSessionLines(
+  session: { id: string; people: number },
+  lines: EditableLine[],
+): Promise<void> {
+  const { data: receiptRows, error: rErr } = await supabase
+    .from('receipts')
+    .select('id')
+    .eq('session_id', session.id)
+  if (rErr) throw rErr
+  const receiptIds = (receiptRows ?? []).map((r) => r.id)
+  if (receiptIds.length) {
+    const { error: delErr } = await supabase.from('receipts').delete().in('id', receiptIds)
+    if (delErr) throw delErr
+  }
+
+  const valid = lines.filter((l) => l.qty > 0 && l.unitPrice >= 0)
+  if (valid.length === 0) return
+  const total = valid.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const receiptId = crypto.randomUUID()
+  const { error: insRErr } = await supabase.from('receipts').insert({
+    id: receiptId,
+    session_id: session.id,
+    total,
+    received: 0,
+    people: Math.max(1, session.people || 1),
+    voided: false,
+  })
+  if (insRErr) throw insRErr
+  const { error: insLErr } = await supabase.from('receipt_lines').insert(
+    valid.map((l) => ({
+      receipt_id: receiptId,
+      menu_id: null,
+      name_snapshot: l.name,
+      qty: l.qty,
+      unit_price: l.unitPrice,
+    })),
+  )
+  if (insLErr) throw insLErr
 }
 
 export function daysAgoStr(days: number): string {

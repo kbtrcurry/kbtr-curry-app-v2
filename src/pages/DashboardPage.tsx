@@ -1,14 +1,30 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../lib/auth'
 import { Spinner } from '../components/Spinner'
-import { useClosedSessions, useReceiptLines, salesBySession, daysAgoStr, monthOf, type ClosedSession } from '../lib/analytics'
+import { ConfirmModal } from '../components/ConfirmModal'
+import {
+  useClosedSessions,
+  useReceiptLines,
+  salesBySession,
+  daysAgoStr,
+  monthOf,
+  deleteSessionCascade,
+  replaceSessionLines,
+  updateSalesSession,
+  type ClosedSession,
+  type EditableLine,
+} from '../lib/analytics'
 import {
   useAllRecipeIngredients,
   useAllMenuComponents,
+  useRecipes,
   groupRecipeIngredientsByRecipe,
   menuCost,
+  perServingCost,
 } from '../lib/masterData'
+import { usePersistedState } from '../lib/persistState'
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString()}`
 type DashTab = 'summary' | 'products' | 'prep'
@@ -44,6 +60,8 @@ export default function DashboardPage() {
   const { data: lines = [], isLoading: linesLoading } = useReceiptLines()
   const { data: allRecipeIngredients = [] } = useAllRecipeIngredients()
   const { data: menuComponents = [] } = useAllMenuComponents()
+  const { data: recipes = [] } = useRecipes()
+  const queryClient = useQueryClient()
 
   const [dashTab, setDashTab] = useState<DashTab>('summary')
   const [sumPeriod, setSumPeriod] = useState<SumPeriod>('month')
@@ -51,7 +69,108 @@ export default function DashboardPage() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [targetInput, setTargetInput] = useState('')
 
+  const [toriokiRecipeId, setToriokiRecipeId] = usePersistedState('kbtr_v2_torioki_recipe', '')
+  const [busy, setBusy] = useState(false)
+  const [confirmDeleteSession, setConfirmDeleteSession] = useState<ClosedSession | null>(null)
+  const [editSessionId, setEditSessionId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ rent: '', otherCost: '', groups: '', people: '', reserved: '', memo: '' })
+  const [menuEditId, setMenuEditId] = useState<string | null>(null)
+  const [menuEditRows, setMenuEditRows] = useState<{ name: string; qty: string; price: string }[]>([])
+
   const recipeIngredientsByRecipe = groupRecipeIngredientsByRecipe(allRecipeIngredients)
+
+  const invalidateAnalytics = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['analytics', 'sessions'] }),
+      queryClient.invalidateQueries({ queryKey: ['analytics', 'receipt_lines'] }),
+    ])
+
+  // 取り置き特典の一食原価（税込・理論値）。選択レシピが無ければ0
+  const toriokiCostPerServing = useMemo(() => {
+    if (!toriokiRecipeId) return 0
+    const r = recipes.find((x) => x.id === toriokiRecipeId)
+    if (!r) return 0
+    return perServingCost(r, recipeIngredientsByRecipe[toriokiRecipeId] ?? [])
+  }, [toriokiRecipeId, recipes, recipeIngredientsByRecipe])
+
+  const uzuraCostBySession = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const s of sessions) map[s.id] = Math.round((s.reserved_people || 0) * toriokiCostPerServing)
+    return map
+  }, [sessions, toriokiCostPerServing])
+
+  const startEdit = (s: ClosedSession) => {
+    setEditSessionId(s.id)
+    setEditForm({
+      rent: String(s.rent),
+      otherCost: String(s.other_cost),
+      groups: String(s.groups),
+      people: String(s.people),
+      reserved: String(s.reserved_people),
+      memo: s.memo,
+    })
+  }
+
+  const saveEdit = async (s: ClosedSession) => {
+    setBusy(true)
+    try {
+      await updateSalesSession(s.id, {
+        rent: Number(editForm.rent) || 0,
+        other_cost: Number(editForm.otherCost) || 0,
+        groups: Number(editForm.groups) || 0,
+        people: Number(editForm.people) || 0,
+        reserved_people: Number(editForm.reserved) || 0,
+        memo: editForm.memo,
+      })
+      await invalidateAnalytics()
+      setEditSessionId(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const startMenuEdit = (s: ClosedSession, dayLines: ReturnType<typeof useReceiptLines>['data']) => {
+    const agg: Record<string, { qty: number; amount: number }> = {}
+    for (const l of dayLines ?? []) {
+      if (l.session_id !== s.id) continue
+      if (!agg[l.name_snapshot]) agg[l.name_snapshot] = { qty: 0, amount: 0 }
+      agg[l.name_snapshot].qty += l.qty
+      agg[l.name_snapshot].amount += l.qty * l.unit_price
+    }
+    const rows = Object.entries(agg).map(([name, v]) => ({
+      name,
+      qty: String(v.qty),
+      price: String(v.qty > 0 ? Math.round(v.amount / v.qty) : 0),
+    }))
+    setMenuEditRows(rows)
+    setMenuEditId(s.id)
+  }
+
+  const saveMenuEdit = async (s: ClosedSession) => {
+    setBusy(true)
+    try {
+      const editLines: EditableLine[] = menuEditRows
+        .map((r) => ({ name: r.name.trim(), qty: Number(r.qty) || 0, unitPrice: Number(r.price) || 0 }))
+        .filter((l) => l.name && l.qty > 0)
+      await replaceSessionLines({ id: s.id, people: s.people }, editLines)
+      await invalidateAnalytics()
+      setMenuEditId(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDeleteSession = async (s: ClosedSession) => {
+    setBusy(true)
+    try {
+      await deleteSessionCascade(s.id)
+      await invalidateAnalytics()
+      setOpenId(null)
+      setConfirmDeleteSession(null)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   // メニューID → 一食原価（税込・理論値）
   const costByMenuId = useMemo(() => {
@@ -87,8 +206,9 @@ export default function DashboardPage() {
   const pFoodCost = pSessions.reduce((a, s) => a + (foodCostBySession[s.id] ?? 0), 0)
   const pFee = pSessions.reduce((a, s) => a + s.rent, 0)
   const pOther = pSessions.reduce((a, s) => a + s.other_cost, 0)
+  const pUzura = pSessions.reduce((a, s) => a + (uzuraCostBySession[s.id] ?? 0), 0)
   const pPeople = pSessions.reduce((a, s) => a + peopleOf(s), 0)
-  const pProfit = pSales - pFoodCost - pFee - pOther
+  const pProfit = pSales - pFoodCost - pFee - pOther - pUzura
   const pRate = pSales > 0 ? (pFoodCost / pSales) * 100 : null
   const avgTicket = pPeople > 0 ? pSales / pPeople : null
   const totalSales = sessions.reduce((a, s) => a + (salesMap[s.id] ?? 0), 0)
@@ -264,13 +384,37 @@ export default function DashboardPage() {
                 <p className="text-xs text-stone-400 mt-1">※実費ベースの実際の利益は「会計」タブのP&amp;Lを参照</p>
               </div>
 
+              <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 mb-4">
+                <label className="block text-xs text-stone-500 mb-1">取り置き特典に使うレシピ（人数×一食原価を利益から差引）</label>
+                <select
+                  value={toriokiRecipeId}
+                  onChange={(e) => setToriokiRecipeId(e.target.value)}
+                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                >
+                  <option value="">未設定</option>
+                  {recipes.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+                {toriokiRecipeId && toriokiCostPerServing > 0 && (
+                  <p className="text-xs text-stone-400 mt-1">一食原価 ¥{Math.round(toriokiCostPerServing).toLocaleString()}（今期の取り置き原価 合計 −{yen(pUzura)}）</p>
+                )}
+              </div>
+
               {last8.length > 0 && (
                 <Section title="売上・推定利益の推移（直近8回）">
                   <LineChart
                     data={last8.map((s) => ({
                       label: s.session_date.slice(5).replace('-', '/'),
                       sales: salesMap[s.id] ?? 0,
-                      profit: (salesMap[s.id] ?? 0) - (foodCostBySession[s.id] ?? 0) - s.rent - s.other_cost,
+                      profit:
+                        (salesMap[s.id] ?? 0) -
+                        (foodCostBySession[s.id] ?? 0) -
+                        s.rent -
+                        s.other_cost -
+                        (uzuraCostBySession[s.id] ?? 0),
                     }))}
                   />
                   <div className="flex gap-4 justify-center text-xs mt-1">
@@ -290,7 +434,8 @@ export default function DashboardPage() {
                     const open = openId === s.id
                     const sales = salesMap[s.id] ?? 0
                     const foodCost = foodCostBySession[s.id] ?? 0
-                    const profit = sales - foodCost - s.rent - s.other_cost
+                    const uzura = uzuraCostBySession[s.id] ?? 0
+                    const profit = sales - foodCost - s.rent - s.other_cost - uzura
                     const rate = sales > 0 ? (foodCost / sales) * 100 : null
                     const ppl = peopleOf(s)
                     const dayLines = linesBySession[s.id] ?? []
@@ -325,13 +470,96 @@ export default function DashboardPage() {
                           </div>
                         </button>
 
-                        {open && (
+                        {open && editSessionId === s.id && (
+                          <div className="px-3 pb-3 pt-1 border-t border-stone-100 text-sm space-y-2">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs text-stone-500 mb-1">場所代</label>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  value={editForm.rent}
+                                  onChange={(e) => setEditForm((f) => ({ ...f, rent: e.target.value }))}
+                                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-stone-500 mb-1">その他経費</label>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  value={editForm.otherCost}
+                                  onChange={(e) => setEditForm((f) => ({ ...f, otherCost: e.target.value }))}
+                                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-stone-500 mb-1">組数</label>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  value={editForm.groups}
+                                  onChange={(e) => setEditForm((f) => ({ ...f, groups: e.target.value }))}
+                                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-stone-500 mb-1">客数</label>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  value={editForm.people}
+                                  onChange={(e) => setEditForm((f) => ({ ...f, people: e.target.value }))}
+                                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-stone-500 mb-1">取り置き人数</label>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  value={editForm.reserved}
+                                  onChange={(e) => setEditForm((f) => ({ ...f, reserved: e.target.value }))}
+                                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-stone-500 mb-1">メモ</label>
+                              <input
+                                type="text"
+                                value={editForm.memo}
+                                onChange={(e) => setEditForm((f) => ({ ...f, memo: e.target.value }))}
+                                className="w-full border border-stone-300 rounded-lg px-2 py-1.5"
+                              />
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                onClick={() => setEditSessionId(null)}
+                                disabled={busy}
+                                className="flex-1 py-2 rounded-lg border border-stone-300 text-stone-600 font-semibold"
+                              >
+                                キャンセル
+                              </button>
+                              <button
+                                onClick={() => void saveEdit(s)}
+                                disabled={busy}
+                                className="flex-1 py-2 rounded-lg bg-amber-700 text-[#faf9f5] font-bold disabled:opacity-50"
+                              >
+                                {busy ? '保存中...' : '保存'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {open && editSessionId !== s.id && (
                           <div className="px-3 pb-3 pt-1 border-t border-stone-100 text-sm">
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1 my-2">
                               <Row label="売上" value={yen(sales)} />
                               <Row label="食材原価（理論）" value={yen(foodCost)} />
                               <Row label="場所代" value={yen(s.rent)} />
                               {s.other_cost > 0 && <Row label="その他経費" value={yen(s.other_cost)} />}
+                              {uzura > 0 && <Row label="取り置き原価" value={yen(uzura)} />}
                               <Row label="推定利益" value={yen(profit)} accent />
                               <Row label="原価率（理論）" value={rate != null ? `${rate.toFixed(1)}%` : '—'} />
                               {s.groups > 0 && <Row label="組数 / 客数" value={`${s.groups}組 / ${ppl}人`} />}
@@ -339,9 +567,83 @@ export default function DashboardPage() {
                               <Row label="事業区分" value={s.segments?.name ?? '—'} />
                             </div>
                             {s.memo && <p className="text-stone-500 mb-2">メモ: {s.memo}</p>}
-                            {menuList.length > 0 && (
-                              <div className="bg-stone-50 rounded-lg p-2">
-                                <p className="text-xs text-stone-400 mb-1">メニュー別</p>
+                            {menuEditId === s.id ? (
+                              <div className="bg-stone-50 rounded-lg p-2 mb-2 space-y-1.5">
+                                <p className="text-xs text-stone-400">メニュー別の数量・単価を編集</p>
+                                {menuEditRows.map((m, i) => (
+                                  <div key={i} className="flex items-center gap-1.5">
+                                    <input
+                                      type="text"
+                                      value={m.name}
+                                      onChange={(e) =>
+                                        setMenuEditRows((arr) => arr.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
+                                      }
+                                      className="flex-1 min-w-0 border border-stone-300 rounded-lg px-2 py-1 bg-white"
+                                    />
+                                    <input
+                                      type="number"
+                                      inputMode="numeric"
+                                      value={m.qty}
+                                      onChange={(e) =>
+                                        setMenuEditRows((arr) => arr.map((x, j) => (j === i ? { ...x, qty: e.target.value } : x)))
+                                      }
+                                      className="w-14 border border-stone-300 rounded-lg px-1.5 py-1 text-right bg-white"
+                                    />
+                                    <span className="text-xs text-stone-400">食</span>
+                                    <input
+                                      type="number"
+                                      inputMode="numeric"
+                                      value={m.price}
+                                      onChange={(e) =>
+                                        setMenuEditRows((arr) => arr.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))
+                                      }
+                                      className="w-16 border border-stone-300 rounded-lg px-1.5 py-1 text-right bg-white"
+                                    />
+                                    <span className="text-xs text-stone-400">円</span>
+                                    <button
+                                      onClick={() => setMenuEditRows((arr) => arr.filter((_, j) => j !== i))}
+                                      className="text-red-400 px-1"
+                                      title="削除"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                ))}
+                                {menuEditRows.length === 0 && <p className="text-xs text-stone-400 py-1">記録がありません</p>}
+                                <button
+                                  onClick={() => setMenuEditRows((arr) => [...arr, { name: '', qty: '1', price: '0' }])}
+                                  className="text-xs text-amber-700 font-semibold border border-dashed border-amber-300 rounded-full px-2.5 py-1"
+                                >
+                                  ＋行を追加
+                                </button>
+                                <div className="flex gap-2 pt-1">
+                                  <button
+                                    onClick={() => setMenuEditId(null)}
+                                    disabled={busy}
+                                    className="flex-1 py-2 rounded-lg border border-stone-300 text-stone-600 font-semibold text-sm"
+                                  >
+                                    キャンセル
+                                  </button>
+                                  <button
+                                    onClick={() => void saveMenuEdit(s)}
+                                    disabled={busy}
+                                    className="flex-1 py-2 rounded-lg bg-amber-700 text-[#faf9f5] font-bold disabled:opacity-50 text-sm"
+                                  >
+                                    {busy ? '保存中...' : '保存'}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-stone-50 rounded-lg p-2 mb-2">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-xs text-stone-400">メニュー別</p>
+                                  <button
+                                    onClick={() => startMenuEdit(s, lines)}
+                                    className="text-xs text-amber-700 font-semibold active:opacity-70"
+                                  >
+                                    ✏️ 数を編集
+                                  </button>
+                                </div>
                                 {menuList.map(([mn, v]) => (
                                   <div key={mn} className="flex justify-between py-0.5 text-stone-700">
                                     <span className="truncate">
@@ -350,8 +652,25 @@ export default function DashboardPage() {
                                     <span className="font-medium text-stone-800 shrink-0 ml-2">{yen(v.amount)}</span>
                                   </div>
                                 ))}
+                                {menuList.length === 0 && <p className="text-xs text-stone-400 py-1">記録がありません</p>}
                               </div>
                             )}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => startEdit(s)}
+                                disabled={busy}
+                                className="flex-1 py-2 rounded-lg border border-stone-300 text-stone-700 font-semibold active:bg-stone-50"
+                              >
+                                ✏️ 編集
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteSession(s)}
+                                disabled={busy}
+                                className="flex-1 py-2 rounded-lg border border-red-200 text-red-600 font-semibold active:bg-red-50 disabled:opacity-50"
+                              >
+                                🗑️ 削除
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -505,6 +824,14 @@ export default function DashboardPage() {
             </div>
           )}
         </>
+      )}
+
+      {confirmDeleteSession && (
+        <ConfirmModal
+          message={`${confirmDeleteSession.session_date} の営業履歴を削除しますか？\n仕訳・レシート明細も含めて削除され、元に戻せません。`}
+          onConfirm={() => void handleDeleteSession(confirmDeleteSession)}
+          onCancel={() => setConfirmDeleteSession(null)}
+        />
       )}
     </div>
   )
