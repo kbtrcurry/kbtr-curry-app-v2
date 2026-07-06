@@ -3,6 +3,18 @@ import { useEffect } from 'react'
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useRegisterSW } from 'virtual:pwa-register/react'
+import {
+  ShoppingCart,
+  ChefHat,
+  Wallet,
+  BarChart3,
+  Carrot,
+  BookOpen,
+  UtensilsCrossed,
+  Receipt,
+  Settings,
+  type LucideIcon,
+} from 'lucide-react'
 import { AuthProvider, useAuth } from './lib/auth'
 import { BackHandlerProvider } from './lib/backHandler'
 import { preloadAll } from './lib/preload'
@@ -22,18 +34,22 @@ const queryClient = new QueryClient({
   },
 })
 
-// デスクトップのサイドバーもモバイルのボトムナビも全項目を表示
-const NAV_ITEMS = [
-  { to: '/', label: 'レジ', icon: '🛒' },
-  { to: '/prep', label: '仕込み', icon: '🍳' },
-  { to: '/accounting', label: '会計', icon: '💰' },
-  { to: '/dashboard', label: '分析', icon: '📊' },
-  { to: '/ingredients', label: '食材', icon: '🥬' },
-  { to: '/recipes', label: 'レシピ', icon: '📖' },
-  { to: '/menus', label: 'メニュー', icon: '🍽️' },
-  { to: '/tax', label: '申告', icon: '🧾' },
-  { to: '/setup', label: '設定', icon: '⚙️' },
+type NavItem = { to: string; label: string; icon: LucideIcon }
+
+// デスクトップのサイドバーは全項目を表示。モバイルのボトムナビは頻度の高い5件のみ（残りは設定タブ内のハブから）
+const NAV_ITEMS: NavItem[] = [
+  { to: '/', label: 'レジ', icon: ShoppingCart },
+  { to: '/prep', label: '仕込み', icon: ChefHat },
+  { to: '/accounting', label: '会計', icon: Wallet },
+  { to: '/dashboard', label: '分析', icon: BarChart3 },
+  { to: '/ingredients', label: '食材', icon: Carrot },
+  { to: '/recipes', label: 'レシピ', icon: BookOpen },
+  { to: '/menus', label: 'メニュー', icon: UtensilsCrossed },
+  { to: '/tax', label: '申告', icon: Receipt },
+  { to: '/setup', label: '設定', icon: Settings },
 ]
+const BOTTOM_NAV_PATHS = new Set(['/', '/prep', '/accounting', '/dashboard', '/setup'])
+const BOTTOM_NAV = NAV_ITEMS.filter((item) => BOTTOM_NAV_PATHS.has(item.to))
 
 function UpdateButton() {
   const {
@@ -98,31 +114,31 @@ function Layout({ children }: { children: ReactNode }) {
                 }`
               }
             >
-              <span className="text-xl">{item.icon}</span>
+              <item.icon className="w-5 h-5" strokeWidth={2} />
               {item.label}
             </NavLink>
           ))}
         </nav>
       </aside>
 
-      <main className="flex-1 min-w-0 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] md:pb-10">{children}</main>
+      <main className="flex-1 min-w-0 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-10">{children}</main>
 
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 flex overflow-x-auto z-40"
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 flex z-40"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        {NAV_ITEMS.map((item) => (
+        {BOTTOM_NAV.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.to === '/'}
             className={({ isActive }) =>
-              `flex-1 min-w-0 flex flex-col items-center py-1.5 text-[9px] gap-0.5 whitespace-nowrap overflow-hidden transition-colors ${
+              `flex-1 flex flex-col items-center py-2 text-xs gap-0.5 transition-colors ${
                 isActive ? 'text-amber-700 font-semibold' : 'text-stone-400'
               }`
             }
           >
-            <span className="text-lg">{item.icon}</span>
+            <item.icon className="w-6 h-6" strokeWidth={2} />
             {item.label}
           </NavLink>
         ))}

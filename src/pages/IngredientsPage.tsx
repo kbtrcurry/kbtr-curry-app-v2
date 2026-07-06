@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Carrot, AlertTriangle, Check, Package } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { useRegisterBack } from '../lib/backHandler'
 import { Spinner } from '../components/Spinner'
@@ -190,7 +191,7 @@ export default function IngredientsPage() {
   if (!authSession) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[70svh] gap-6">
-        <div className="text-6xl">🥬</div>
+        <Carrot className="w-16 h-16 text-amber-700" strokeWidth={1.5} />
         <h1 className="text-xl font-bold text-amber-800">食材マスタ</h1>
         <button
           onClick={() => void loginWithGoogle()}
@@ -228,7 +229,9 @@ export default function IngredientsPage() {
   return (
     <div className="p-4 pb-24 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-xl font-bold text-amber-800">🥬 食材マスタ</h1>
+        <h1 className="text-xl font-bold text-amber-800 flex items-center gap-2">
+          <Carrot className="w-5 h-5" /> 食材マスタ
+        </h1>
         <button
           onClick={() => {
             setAdding((v) => !v)
@@ -379,12 +382,16 @@ export default function IngredientsPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {alert && <span className="text-xs bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded">⚠️在庫少</span>}
-                  <span className="w-4 text-center">
+                  {alert && (
+                    <span className="text-xs bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded flex items-center gap-0.5">
+                      <AlertTriangle className="w-3 h-3" />在庫少
+                    </span>
+                  )}
+                  <span className="w-4 text-center flex items-center justify-center">
                     {savingId === ing.id ? (
                       <span className="text-stone-400 text-xs">…</span>
                     ) : savedId === ing.id ? (
-                      <span className="text-green-500">✓</span>
+                      <Check className="w-4 h-4 text-green-500" />
                     ) : null}
                   </span>
                 </div>
@@ -409,9 +416,15 @@ export default function IngredientsPage() {
 
               <button
                 onClick={() => openPurchase(ing)}
-                className="mt-2 w-full text-xs text-amber-700 font-semibold border border-dashed border-amber-300 rounded-lg py-1.5"
+                className="mt-2 w-full text-xs text-amber-700 font-semibold border border-dashed border-amber-300 rounded-lg py-1.5 flex items-center justify-center gap-1"
               >
-                {purchaseId === ing.id ? '仕入れ記録を閉じる' : '📦 仕入れ記録を追加'}
+                {purchaseId === ing.id ? (
+                  '仕入れ記録を閉じる'
+                ) : (
+                  <>
+                    <Package className="w-3.5 h-3.5" /> 仕入れ記録を追加
+                  </>
+                )}
               </button>
 
               {purchaseId === ing.id && (

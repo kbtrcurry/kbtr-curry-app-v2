@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { Spinner } from '../components/Spinner'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { UtensilsCrossed } from 'lucide-react'
 import {
   useAllMenus,
   useAllMenuComponents,
@@ -132,7 +133,7 @@ export default function MenuSettingsPage() {
   if (!authSession) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[70svh] gap-6">
-        <div className="text-6xl">🍽️</div>
+        <UtensilsCrossed className="w-16 h-16 text-amber-700" strokeWidth={1.5} />
         <h1 className="text-xl font-bold text-amber-800">メニュー設定</h1>
         <button
           onClick={() => void loginWithGoogle()}
@@ -149,7 +150,9 @@ export default function MenuSettingsPage() {
   return (
     <div className="p-4 pb-24 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-xl font-bold text-amber-800">🍽️ メニュー設定</h1>
+        <h1 className="text-xl font-bold text-amber-800 flex items-center gap-2">
+          <UtensilsCrossed className="w-5 h-5" /> メニュー設定
+        </h1>
       </div>
       <p className="text-xs text-stone-500 mb-3">
         <span className="font-semibold">有効(ON)</span>がレジに表示／原価は税込（{activeCount}件 有効）
@@ -187,28 +190,36 @@ export default function MenuSettingsPage() {
                 </button>
               </div>
 
-              <div className="space-y-1.5 mb-2">
+              <div className="space-y-2.5 mb-2">
                 {comps.map((c) => {
                   const key = c.id
                   const cval = servEdit[key] !== undefined ? servEdit[key] : String(c.servings)
                   const cCost = recipeCostPerServing(c.recipe_id) * c.servings
                   return (
-                    <div key={c.id} className="flex items-center gap-2 text-sm">
-                      <span className="flex-1 min-w-0 truncate text-stone-800">{c.recipes.name}</span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.5"
-                        value={cval}
-                        onChange={(e) => setServEdit((p) => ({ ...p, [key]: e.target.value }))}
-                        onBlur={(e) => setCompServings(c, e.target.value)}
-                        className="w-14 border border-stone-300 rounded px-1.5 py-1 text-right"
-                      />
-                      <span className="text-xs text-stone-400 w-4">食</span>
-                      <span className="w-16 text-right text-stone-600">¥{Math.round(cCost).toLocaleString()}</span>
-                      <button onClick={() => removeComp(c)} className="text-stone-300 text-lg px-1 shrink-0" aria-label="外す">
-                        ×
-                      </button>
+                    <div key={c.id} className="border border-stone-100 rounded-lg px-2.5 py-2 text-sm">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="flex-1 min-w-0 truncate text-stone-800 font-medium">{c.recipes.name}</span>
+                        <button
+                          onClick={() => removeComp(c)}
+                          className="text-stone-300 text-xl leading-none p-1 -m-1 shrink-0"
+                          aria-label="外す"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 justify-end">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.5"
+                          value={cval}
+                          onChange={(e) => setServEdit((p) => ({ ...p, [key]: e.target.value }))}
+                          onBlur={(e) => setCompServings(c, e.target.value)}
+                          className="w-16 border border-stone-300 rounded-lg px-2 py-2 text-right"
+                        />
+                        <span className="text-xs text-stone-400">食</span>
+                        <span className="text-stone-600 ml-2">¥{Math.round(cCost).toLocaleString()}</span>
+                      </div>
                     </div>
                   )
                 })}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Pencil, Trash2, Plus, BarChart3 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { Spinner } from '../components/Spinner'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -69,7 +70,8 @@ export default function DashboardPage() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [targetInput, setTargetInput] = useState('')
 
-  const [toriokiRecipeId, setToriokiRecipeId] = usePersistedState('kbtr_v2_torioki_recipe', '')
+  // 取り置き特典に使うレシピは設定タブで選択する（同じキーをここでも読むだけ）
+  const [toriokiRecipeId] = usePersistedState('kbtr_v2_torioki_recipe', '')
   const [busy, setBusy] = useState(false)
   const [confirmDeleteSession, setConfirmDeleteSession] = useState<ClosedSession | null>(null)
   const [editSessionId, setEditSessionId] = useState<string | null>(null)
@@ -308,7 +310,7 @@ export default function DashboardPage() {
   if (!authSession) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[70svh] gap-6">
-        <div className="text-6xl">📊</div>
+        <BarChart3 className="w-16 h-16 text-amber-700" strokeWidth={1.5} />
         <h1 className="text-xl font-bold text-amber-800">ダッシュボード</h1>
         <button
           onClick={() => void loginWithGoogle()}
@@ -326,7 +328,9 @@ export default function DashboardPage() {
   return (
     <div className="p-4 pb-24 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-3">
-        <h1 className="text-xl font-bold text-amber-800">📊 ダッシュボード</h1>
+        <h1 className="text-xl font-bold text-amber-800 flex items-center gap-2">
+          <BarChart3 className="w-5 h-5" /> ダッシュボード
+        </h1>
       </div>
 
       {loading && <Spinner />}
@@ -382,25 +386,6 @@ export default function DashboardPage() {
                 </div>
                 <p className="text-xs text-stone-400 mt-3">累計売上 {yen(totalSales)}</p>
                 <p className="text-xs text-stone-400 mt-1">※実費ベースの実際の利益は「会計」タブのP&amp;Lを参照</p>
-              </div>
-
-              <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 mb-4">
-                <label className="block text-xs text-stone-500 mb-1">取り置き特典に使うレシピ（人数×一食原価を利益から差引）</label>
-                <select
-                  value={toriokiRecipeId}
-                  onChange={(e) => setToriokiRecipeId(e.target.value)}
-                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5 text-sm bg-white"
-                >
-                  <option value="">未設定</option>
-                  {recipes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-                {toriokiRecipeId && toriokiCostPerServing > 0 && (
-                  <p className="text-xs text-stone-400 mt-1">一食原価 ¥{Math.round(toriokiCostPerServing).toLocaleString()}（今期の取り置き原価 合計 −{yen(pUzura)}）</p>
-                )}
               </div>
 
               {last8.length > 0 && (
@@ -470,89 +455,7 @@ export default function DashboardPage() {
                           </div>
                         </button>
 
-                        {open && editSessionId === s.id && (
-                          <div className="px-3 pb-3 pt-1 border-t border-stone-100 text-sm space-y-2">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-xs text-stone-500 mb-1">場所代</label>
-                                <input
-                                  type="number"
-                                  inputMode="numeric"
-                                  value={editForm.rent}
-                                  onChange={(e) => setEditForm((f) => ({ ...f, rent: e.target.value }))}
-                                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-stone-500 mb-1">その他経費</label>
-                                <input
-                                  type="number"
-                                  inputMode="numeric"
-                                  value={editForm.otherCost}
-                                  onChange={(e) => setEditForm((f) => ({ ...f, otherCost: e.target.value }))}
-                                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-stone-500 mb-1">組数</label>
-                                <input
-                                  type="number"
-                                  inputMode="numeric"
-                                  value={editForm.groups}
-                                  onChange={(e) => setEditForm((f) => ({ ...f, groups: e.target.value }))}
-                                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-stone-500 mb-1">客数</label>
-                                <input
-                                  type="number"
-                                  inputMode="numeric"
-                                  value={editForm.people}
-                                  onChange={(e) => setEditForm((f) => ({ ...f, people: e.target.value }))}
-                                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-stone-500 mb-1">取り置き人数</label>
-                                <input
-                                  type="number"
-                                  inputMode="numeric"
-                                  value={editForm.reserved}
-                                  onChange={(e) => setEditForm((f) => ({ ...f, reserved: e.target.value }))}
-                                  className="w-full border border-stone-300 rounded-lg px-2 py-1.5"
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-xs text-stone-500 mb-1">メモ</label>
-                              <input
-                                type="text"
-                                value={editForm.memo}
-                                onChange={(e) => setEditForm((f) => ({ ...f, memo: e.target.value }))}
-                                className="w-full border border-stone-300 rounded-lg px-2 py-1.5"
-                              />
-                            </div>
-                            <div className="flex gap-2 pt-1">
-                              <button
-                                onClick={() => setEditSessionId(null)}
-                                disabled={busy}
-                                className="flex-1 py-2 rounded-lg border border-stone-300 text-stone-600 font-semibold"
-                              >
-                                キャンセル
-                              </button>
-                              <button
-                                onClick={() => void saveEdit(s)}
-                                disabled={busy}
-                                className="flex-1 py-2 rounded-lg bg-amber-700 text-[#faf9f5] font-bold disabled:opacity-50"
-                              >
-                                {busy ? '保存中...' : '保存'}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {open && editSessionId !== s.id && (
+                        {open && (
                           <div className="px-3 pb-3 pt-1 border-t border-stone-100 text-sm">
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1 my-2">
                               <Row label="売上" value={yen(sales)} />
@@ -567,108 +470,40 @@ export default function DashboardPage() {
                               <Row label="事業区分" value={s.segments?.name ?? '—'} />
                             </div>
                             {s.memo && <p className="text-stone-500 mb-2">メモ: {s.memo}</p>}
-                            {menuEditId === s.id ? (
-                              <div className="bg-stone-50 rounded-lg p-2 mb-2 space-y-1.5">
-                                <p className="text-xs text-stone-400">メニュー別の数量・単価を編集</p>
-                                {menuEditRows.map((m, i) => (
-                                  <div key={i} className="flex items-center gap-1.5">
-                                    <input
-                                      type="text"
-                                      value={m.name}
-                                      onChange={(e) =>
-                                        setMenuEditRows((arr) => arr.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
-                                      }
-                                      className="flex-1 min-w-0 border border-stone-300 rounded-lg px-2 py-1 bg-white"
-                                    />
-                                    <input
-                                      type="number"
-                                      inputMode="numeric"
-                                      value={m.qty}
-                                      onChange={(e) =>
-                                        setMenuEditRows((arr) => arr.map((x, j) => (j === i ? { ...x, qty: e.target.value } : x)))
-                                      }
-                                      className="w-14 border border-stone-300 rounded-lg px-1.5 py-1 text-right bg-white"
-                                    />
-                                    <span className="text-xs text-stone-400">食</span>
-                                    <input
-                                      type="number"
-                                      inputMode="numeric"
-                                      value={m.price}
-                                      onChange={(e) =>
-                                        setMenuEditRows((arr) => arr.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))
-                                      }
-                                      className="w-16 border border-stone-300 rounded-lg px-1.5 py-1 text-right bg-white"
-                                    />
-                                    <span className="text-xs text-stone-400">円</span>
-                                    <button
-                                      onClick={() => setMenuEditRows((arr) => arr.filter((_, j) => j !== i))}
-                                      className="text-red-400 px-1"
-                                      title="削除"
-                                    >
-                                      🗑️
-                                    </button>
-                                  </div>
-                                ))}
-                                {menuEditRows.length === 0 && <p className="text-xs text-stone-400 py-1">記録がありません</p>}
+                            <div className="bg-stone-50 rounded-lg p-2 mb-2">
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="text-xs text-stone-400">メニュー別</p>
                                 <button
-                                  onClick={() => setMenuEditRows((arr) => [...arr, { name: '', qty: '1', price: '0' }])}
-                                  className="text-xs text-amber-700 font-semibold border border-dashed border-amber-300 rounded-full px-2.5 py-1"
+                                  onClick={() => startMenuEdit(s, lines)}
+                                  className="text-xs text-amber-700 font-semibold active:opacity-70 flex items-center gap-1"
                                 >
-                                  ＋行を追加
+                                  <Pencil className="w-3 h-3" /> 数を編集
                                 </button>
-                                <div className="flex gap-2 pt-1">
-                                  <button
-                                    onClick={() => setMenuEditId(null)}
-                                    disabled={busy}
-                                    className="flex-1 py-2 rounded-lg border border-stone-300 text-stone-600 font-semibold text-sm"
-                                  >
-                                    キャンセル
-                                  </button>
-                                  <button
-                                    onClick={() => void saveMenuEdit(s)}
-                                    disabled={busy}
-                                    className="flex-1 py-2 rounded-lg bg-amber-700 text-[#faf9f5] font-bold disabled:opacity-50 text-sm"
-                                  >
-                                    {busy ? '保存中...' : '保存'}
-                                  </button>
-                                </div>
                               </div>
-                            ) : (
-                              <div className="bg-stone-50 rounded-lg p-2 mb-2">
-                                <div className="flex items-center justify-between mb-1">
-                                  <p className="text-xs text-stone-400">メニュー別</p>
-                                  <button
-                                    onClick={() => startMenuEdit(s, lines)}
-                                    className="text-xs text-amber-700 font-semibold active:opacity-70"
-                                  >
-                                    ✏️ 数を編集
-                                  </button>
+                              {menuList.map(([mn, v]) => (
+                                <div key={mn} className="flex justify-between py-0.5 text-stone-700">
+                                  <span className="truncate">
+                                    {mn} <span className="text-stone-400">×{v.qty}</span>
+                                  </span>
+                                  <span className="font-medium text-stone-800 shrink-0 ml-2">{yen(v.amount)}</span>
                                 </div>
-                                {menuList.map(([mn, v]) => (
-                                  <div key={mn} className="flex justify-between py-0.5 text-stone-700">
-                                    <span className="truncate">
-                                      {mn} <span className="text-stone-400">×{v.qty}</span>
-                                    </span>
-                                    <span className="font-medium text-stone-800 shrink-0 ml-2">{yen(v.amount)}</span>
-                                  </div>
-                                ))}
-                                {menuList.length === 0 && <p className="text-xs text-stone-400 py-1">記録がありません</p>}
-                              </div>
-                            )}
+                              ))}
+                              {menuList.length === 0 && <p className="text-xs text-stone-400 py-1">記録がありません</p>}
+                            </div>
                             <div className="flex gap-2">
                               <button
                                 onClick={() => startEdit(s)}
                                 disabled={busy}
-                                className="flex-1 py-2 rounded-lg border border-stone-300 text-stone-700 font-semibold active:bg-stone-50"
+                                className="flex-1 py-2 rounded-lg border border-stone-300 text-stone-700 font-semibold active:bg-stone-50 flex items-center justify-center gap-1.5"
                               >
-                                ✏️ 編集
+                                <Pencil className="w-4 h-4" /> 編集
                               </button>
                               <button
                                 onClick={() => setConfirmDeleteSession(s)}
                                 disabled={busy}
-                                className="flex-1 py-2 rounded-lg border border-red-200 text-red-600 font-semibold active:bg-red-50 disabled:opacity-50"
+                                className="flex-1 py-2 rounded-lg border border-red-200 text-red-600 font-semibold active:bg-red-50 disabled:opacity-50 flex items-center justify-center gap-1.5"
                               >
-                                🗑️ 削除
+                                <Trash2 className="w-4 h-4" /> 削除
                               </button>
                             </div>
                           </div>
@@ -833,6 +668,174 @@ export default function DashboardPage() {
           onCancel={() => setConfirmDeleteSession(null)}
         />
       )}
+
+      {editSessionId &&
+        (() => {
+          const s = sessions.find((x) => x.id === editSessionId)
+          if (!s) return null
+          return (
+            <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
+              <div className="bg-white w-full max-w-lg rounded-t-2xl md:rounded-2xl p-5 space-y-3 overflow-y-auto max-h-[90svh]">
+                <h2 className="text-lg font-bold text-stone-900">{s.session_date} を編集</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-stone-500 mb-1">場所代</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={editForm.rent}
+                      onChange={(e) => setEditForm((f) => ({ ...f, rent: e.target.value }))}
+                      className="w-full border border-stone-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-stone-500 mb-1">その他経費</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={editForm.otherCost}
+                      onChange={(e) => setEditForm((f) => ({ ...f, otherCost: e.target.value }))}
+                      className="w-full border border-stone-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-stone-500 mb-1">組数</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={editForm.groups}
+                      onChange={(e) => setEditForm((f) => ({ ...f, groups: e.target.value }))}
+                      className="w-full border border-stone-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-stone-500 mb-1">客数</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={editForm.people}
+                      onChange={(e) => setEditForm((f) => ({ ...f, people: e.target.value }))}
+                      className="w-full border border-stone-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-stone-500 mb-1">取り置き人数</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={editForm.reserved}
+                      onChange={(e) => setEditForm((f) => ({ ...f, reserved: e.target.value }))}
+                      className="w-full border border-stone-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-stone-500 mb-1">メモ</label>
+                  <input
+                    type="text"
+                    value={editForm.memo}
+                    onChange={(e) => setEditForm((f) => ({ ...f, memo: e.target.value }))}
+                    className="w-full border border-stone-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+                <div className="flex gap-3 pt-1">
+                  <button
+                    onClick={() => setEditSessionId(null)}
+                    disabled={busy}
+                    className="flex-1 py-3 rounded-xl border border-stone-300 text-stone-600 font-semibold"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={() => void saveEdit(s)}
+                    disabled={busy}
+                    className="flex-1 py-3 rounded-xl bg-amber-700 text-[#faf9f5] font-bold disabled:opacity-50"
+                  >
+                    {busy ? '保存中...' : '保存'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+
+      {menuEditId &&
+        (() => {
+          const s = sessions.find((x) => x.id === menuEditId)
+          if (!s) return null
+          return (
+            <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
+              <div className="bg-white w-full max-w-lg rounded-t-2xl md:rounded-2xl p-5 space-y-3 overflow-y-auto max-h-[90svh]">
+                <h2 className="text-lg font-bold text-stone-900">{s.session_date} のメニュー別を編集</h2>
+                <div className="space-y-1.5">
+                  {menuEditRows.map((m, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={m.name}
+                        onChange={(e) =>
+                          setMenuEditRows((arr) => arr.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
+                        }
+                        placeholder="メニュー名"
+                        className="flex-1 min-w-0 border border-stone-300 rounded-lg px-2 py-2"
+                      />
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={m.qty}
+                        onChange={(e) =>
+                          setMenuEditRows((arr) => arr.map((x, j) => (j === i ? { ...x, qty: e.target.value } : x)))
+                        }
+                        className="w-16 border border-stone-300 rounded-lg px-2 py-2 text-right"
+                      />
+                      <span className="text-xs text-stone-400 shrink-0">食</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={m.price}
+                        onChange={(e) =>
+                          setMenuEditRows((arr) => arr.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))
+                        }
+                        className="w-20 border border-stone-300 rounded-lg px-2 py-2 text-right"
+                      />
+                      <span className="text-xs text-stone-400 shrink-0">円</span>
+                      <button
+                        onClick={() => setMenuEditRows((arr) => arr.filter((_, j) => j !== i))}
+                        className="text-red-400 p-1 shrink-0"
+                        title="削除"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {menuEditRows.length === 0 && <p className="text-xs text-stone-400 py-1">記録がありません</p>}
+                  <button
+                    onClick={() => setMenuEditRows((arr) => [...arr, { name: '', qty: '1', price: '0' }])}
+                    className="text-xs text-amber-700 font-semibold border border-dashed border-amber-300 rounded-full px-2.5 py-1.5 flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> 行を追加
+                  </button>
+                </div>
+                <div className="flex gap-3 pt-1">
+                  <button
+                    onClick={() => setMenuEditId(null)}
+                    disabled={busy}
+                    className="flex-1 py-3 rounded-xl border border-stone-300 text-stone-600 font-semibold"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={() => void saveMenuEdit(s)}
+                    disabled={busy}
+                    className="flex-1 py-3 rounded-xl bg-amber-700 text-[#faf9f5] font-bold disabled:opacity-50"
+                  >
+                    {busy ? '保存中...' : '保存'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
     </div>
   )
 }

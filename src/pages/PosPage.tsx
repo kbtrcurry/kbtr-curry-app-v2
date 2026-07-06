@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { ShoppingCart, Trash2, Check } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { Spinner } from '../components/Spinner'
 import { usePersistedState } from '../lib/persistState'
@@ -385,7 +386,9 @@ export default function PosPage() {
   return (
     <div className="p-4 pb-40">
       <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-bold text-amber-800">🛒 レジ</h1>
+        <h1 className="text-2xl font-bold text-amber-800 flex items-center gap-2">
+          <ShoppingCart className="w-6 h-6" /> レジ
+        </h1>
         <div className="flex items-center gap-2">
           {pendingCount > 0 && (
             <span className="text-xs text-amber-600 border border-amber-300 rounded-full px-2 py-0.5">
@@ -440,10 +443,10 @@ export default function PosPage() {
                 </div>
                 <button
                   onClick={() => void handleVoid(r.id)}
-                  className="text-red-400 text-lg leading-none shrink-0 active:text-red-600"
+                  className="text-red-400 shrink-0 active:text-red-600"
                   title="削除"
                 >
-                  🗑️
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             ))}
@@ -452,8 +455,8 @@ export default function PosPage() {
       </div>
 
       {done && (
-        <div className="mb-4 bg-green-100 text-green-700 rounded-lg px-4 py-3 font-semibold text-center">
-          ✓ 本日の売上を記録しました
+        <div className="mb-4 bg-green-100 text-green-700 rounded-lg px-4 py-3 font-semibold text-center flex items-center justify-center gap-1.5">
+          <Check className="w-4 h-4" /> 本日の売上を記録しました
         </div>
       )}
 

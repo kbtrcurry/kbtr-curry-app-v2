@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth'
 import { useRegisterBack } from '../lib/backHandler'
 import { Spinner } from '../components/Spinner'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { BookOpen, Pencil, Trash2 } from 'lucide-react'
 import { useIngredients } from '../lib/masterData'
 import { getRecent, pushRecent, RECENT_KEYS, RECENT_LABEL } from '../lib/recent'
 import { usePersistedState } from '../lib/persistState'
@@ -234,7 +235,7 @@ export default function RecipesPage() {
   if (!authSession) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[70svh] gap-6">
-        <div className="text-6xl">📖</div>
+        <BookOpen className="w-16 h-16 text-amber-700" strokeWidth={1.5} />
         <h1 className="text-xl font-bold text-amber-800">レシピ</h1>
         <button
           onClick={() => void loginWithGoogle()}
@@ -274,7 +275,9 @@ export default function RecipesPage() {
   return (
     <div className="p-4 pb-24 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-xl font-bold text-amber-800">📖 レシピ</h1>
+        <h1 className="text-xl font-bold text-amber-800 flex items-center gap-2">
+          <BookOpen className="w-5 h-5" /> レシピ
+        </h1>
       </div>
       <p className="text-xs text-stone-500 mb-3">
         金額はすべて<span className="font-semibold">税込み（8%）</span>表示
@@ -401,16 +404,16 @@ export default function RecipesPage() {
                   setRenaming(true)
                   setRenameVal(selected.name)
                 }}
-                className="text-xs border border-stone-300 rounded-lg px-2 py-1 text-stone-600"
+                className="text-xs border border-stone-300 rounded-lg px-2 py-1 text-stone-600 flex items-center gap-1"
               >
-                ✏️ 名前変更
+                <Pencil className="w-3 h-3" /> 名前変更
               </button>
               <button
                 onClick={() => setConfirmDeleteRecipe(true)}
                 disabled={deleting}
-                className="text-xs border border-red-200 rounded-lg px-2 py-1 text-red-500 disabled:opacity-40"
+                className="text-xs border border-red-200 rounded-lg px-2 py-1 text-red-500 disabled:opacity-40 flex items-center gap-1"
               >
-                🗑️ 削除
+                <Trash2 className="w-3 h-3" /> 削除
               </button>
             </div>
           </div>
@@ -458,26 +461,30 @@ export default function RecipesPage() {
                 key={r.id}
                 className={`border rounded-lg p-2.5 ${r.price === 0 ? 'border-amber-200 bg-amber-50/40' : 'border-stone-200'}`}
               >
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2 mb-2">
                   <span className="flex-1 min-w-0 truncate text-base font-medium text-stone-900">{r.ingredients.name}</span>
+                  <button
+                    onClick={() => setConfirmDeleteItem(r)}
+                    className="text-stone-300 text-xl leading-none p-1 -m-1 shrink-0"
+                    aria-label="削除"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <span className="text-xs text-stone-500 shrink-0 mr-auto">
+                    原価 ¥{Math.round(r.cost).toLocaleString()}
+                    {r.price === 0 && <span className="text-amber-600">(単価未設定)</span>}
+                  </span>
                   <input
                     type="number"
                     inputMode="decimal"
                     value={qtyVals[r.id] !== undefined ? qtyVals[r.id] : String(r.quantity)}
                     onChange={(e) => setQtyVals((p) => ({ ...p, [r.id]: e.target.value }))}
                     onBlur={(e) => saveQty(r, e.target.value)}
-                    className="w-16 border border-stone-300 rounded px-1.5 py-1.5 text-right text-base outline-none focus:border-amber-400"
+                    className="w-16 border border-stone-300 rounded-lg px-2 py-2 text-right text-base outline-none focus:border-amber-400"
                   />
-                  <span className="w-10 text-center text-sm text-stone-500">{r.unit}</span>
-                  <button onClick={() => setConfirmDeleteItem(r)} className="text-stone-300 text-xl px-1 shrink-0" aria-label="削除">
-                    ×
-                  </button>
-                </div>
-                <div className="flex items-center justify-end mt-1">
-                  <span className="text-xs text-stone-500 shrink-0">
-                    原価 ¥{Math.round(r.cost).toLocaleString()}
-                    {r.price === 0 && <span className="text-amber-600">(単価未設定)</span>}
-                  </span>
+                  <span className="w-8 text-center text-sm text-stone-500">{r.unit}</span>
                 </div>
               </div>
             ))}

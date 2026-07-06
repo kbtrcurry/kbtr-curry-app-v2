@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { ChefHat, ShoppingCart } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { Spinner } from '../components/Spinner'
 import {
@@ -99,7 +100,7 @@ export default function PrepPage() {
   if (!authSession) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[70svh] gap-6">
-        <div className="text-6xl">🍳</div>
+        <ChefHat className="w-16 h-16 text-amber-700" strokeWidth={1.5} />
         <h1 className="text-xl font-bold text-amber-800">仕込み計画</h1>
         <button
           onClick={() => void loginWithGoogle()}
@@ -114,7 +115,9 @@ export default function PrepPage() {
   return (
     <div className="p-4 pb-24 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-3">
-        <h1 className="text-xl font-bold text-amber-800">🍳 仕込み計画</h1>
+        <h1 className="text-xl font-bold text-amber-800 flex items-center gap-2">
+          <ChefHat className="w-5 h-5" /> 仕込み計画
+        </h1>
       </div>
 
       {recipesLoading && <Spinner />}
@@ -152,15 +155,15 @@ export default function PrepPage() {
         <div className="flex border border-stone-200 rounded-lg overflow-hidden mb-3">
           <button
             onClick={() => setSubTab('shopping')}
-            className={`flex-1 py-2 text-sm font-semibold ${subTab === 'shopping' ? 'bg-amber-700 text-[#faf9f5]' : 'text-stone-500'}`}
+            className={`flex-1 py-2 text-sm font-semibold flex items-center justify-center gap-1.5 ${subTab === 'shopping' ? 'bg-amber-700 text-[#faf9f5]' : 'text-stone-500'}`}
           >
-            🛒 買い出し
+            <ShoppingCart className="w-4 h-4" /> 買い出し
           </button>
           <button
             onClick={() => setSubTab('recipes')}
-            className={`flex-1 py-2 text-sm font-semibold ${subTab === 'recipes' ? 'bg-amber-700 text-[#faf9f5]' : 'text-stone-500'}`}
+            className={`flex-1 py-2 text-sm font-semibold flex items-center justify-center gap-1.5 ${subTab === 'recipes' ? 'bg-amber-700 text-[#faf9f5]' : 'text-stone-500'}`}
           >
-            🍳 仕込みレシピ
+            <ChefHat className="w-4 h-4" /> 仕込みレシピ
           </button>
         </div>
       )}

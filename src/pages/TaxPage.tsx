@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Receipt, Check, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { Spinner } from '../components/Spinner'
 import { useSegments, useAllAccounts, useJournalEntries, type JournalEntry } from '../lib/accounting'
@@ -74,7 +75,7 @@ export default function TaxPage() {
   if (!authSession) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[70svh] gap-6">
-        <div className="text-6xl">🧾</div>
+        <Receipt className="w-16 h-16 text-amber-700" strokeWidth={1.5} />
         <h1 className="text-2xl font-bold text-amber-800">確定申告準備</h1>
         <button
           onClick={() => void loginWithGoogle()}
@@ -88,7 +89,9 @@ export default function TaxPage() {
 
   return (
     <div className="p-4 pb-24 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold text-amber-800 mb-3">🧾 確定申告準備</h1>
+      <h1 className="text-2xl font-bold text-amber-800 mb-3 flex items-center gap-2">
+        <Receipt className="w-6 h-6" /> 確定申告準備
+      </h1>
 
       <div className="flex gap-1 mb-4 overflow-x-auto">
         {TABS.map((t) => (
@@ -351,10 +354,14 @@ function CheckTab({
           <span className="font-mono">¥{totalCredit.toLocaleString()}</span>
         </div>
         {totalDebit === totalCredit && unbalanced.length === 0 ? (
-          <p className="text-green-600 text-sm font-semibold">✓ 一致しています</p>
+          <p className="text-green-600 text-sm font-semibold flex items-center gap-1">
+            <Check className="w-4 h-4" /> 一致しています
+          </p>
         ) : (
           <div className="text-red-600 text-sm font-semibold space-y-1">
-            <p>⚠ 不一致の仕訳が {unbalanced.length} 件あります</p>
+            <p className="flex items-center gap-1">
+              <AlertTriangle className="w-4 h-4" /> 不一致の仕訳が {unbalanced.length} 件あります
+            </p>
             {unbalanced.map((e) => (
               <p key={e.id} className="font-normal text-stone-600">
                 {e.entry_date} {e.description}
@@ -393,7 +400,7 @@ function CheckTab({
                 >
                   {m.month.slice(5)}月
                   <br />
-                  {m.done ? '✓' : '⚠'}
+                  {m.done ? <Check className="w-3.5 h-3.5 inline" /> : <AlertTriangle className="w-3.5 h-3.5 inline" />}
                 </div>
               ))}
             </div>

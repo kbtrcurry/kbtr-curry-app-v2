@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Wallet, Trash2, Check, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { Spinner } from '../components/Spinner'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -91,7 +92,7 @@ export default function AccountingPage() {
   if (!authSession) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[70svh] gap-6">
-        <div className="text-6xl">💰</div>
+        <Wallet className="w-16 h-16 text-amber-700" strokeWidth={1.5} />
         <h1 className="text-2xl font-bold text-amber-800">コバタロカレー 会計</h1>
         <button
           onClick={() => void loginWithGoogle()}
@@ -105,7 +106,9 @@ export default function AccountingPage() {
 
   return (
     <div className="p-4 pb-24 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold text-amber-800 mb-3">💰 会計</h1>
+      <h1 className="text-2xl font-bold text-amber-800 mb-3 flex items-center gap-2">
+        <Wallet className="w-6 h-6" /> 会計
+      </h1>
 
       <div className="flex gap-1 mb-4 overflow-x-auto">
         {TABS.map((t) => (
@@ -324,7 +327,7 @@ function ExpenseTab({
             </div>
             <span className="font-bold text-stone-900 shrink-0">¥{entryTotal(e, 'debit').toLocaleString()}</span>
             <button onClick={() => setConfirmTarget(e)} className="text-red-400 shrink-0" title="削除">
-              🗑️
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
         ))}
@@ -408,8 +411,9 @@ function RevenueTab({
                 done ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
               }`}
             >
-              <span>
-                {done ? '✓' : '⚠'} {s.name}の{yearMonth}分
+              <span className="flex items-center gap-1">
+                {done ? <Check className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                {s.name}の{yearMonth}分
               </span>
               <span>{done ? '入力済み' : '未入力'}</span>
             </div>
@@ -514,7 +518,7 @@ function RevenueTab({
             </div>
             <span className="font-bold text-stone-900 shrink-0">¥{entryTotal(e, 'credit').toLocaleString()}</span>
             <button onClick={() => setConfirmTarget(e)} className="text-red-400 shrink-0" title="削除">
-              🗑️
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
         ))}
@@ -558,7 +562,7 @@ function LedgerTab({ entries, onSaved }: { entries: JournalEntry[]; onSaved: () 
             </div>
             {e.source_type !== 'pos_close' && (
               <button onClick={() => setConfirmTarget(e)} className="text-red-400 shrink-0" title="削除">
-                🗑️
+                <Trash2 className="w-4 h-4" />
               </button>
             )}
           </div>
