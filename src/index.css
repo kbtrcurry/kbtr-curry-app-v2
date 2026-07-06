@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+/* Claude Code 風ダークテーマ。utilityのトークンを総入れ替え */
+@theme {
+  /* サーフェス（bg-white）= ダークパネル */
+  --color-white: #232120;
+
+  /* ニュートラル: 数字が大きいほど明るい文字、小さいほど暗い面/枠 */
+  --color-stone-50: #2a2825;
+  --color-stone-100: #2d2b28;
+  --color-stone-200: #3a3733;
+  --color-stone-300: #4a4641;
+  --color-stone-400: #6f6a62;
+  --color-stone-500: #918b81;
+  --color-stone-600: #b0aaa0;
+  --color-stone-700: #cbc5ba;
+  --color-stone-800: #e0dbd2;
+  --color-stone-900: #f2efe8;
+
+  /* アクセント: Claudeコーラル/クレイ */
+  --color-amber-50: #2c1f18;
+  --color-amber-100: #3a2820;
+  --color-amber-200: #573829;
+  --color-amber-300: #6f4632;
+  --color-amber-400: #cf7a52;
+  --color-amber-500: #d9824f;
+  --color-amber-600: #b85e36;
+  --color-amber-700: #c96a40;
+  --color-amber-800: #e0936e;
+  --color-amber-900: #eaa078;
+
+  /* 利益/良好 */
+  --color-green-100: #16331f;
+  --color-green-600: #5cc07d;
+  --color-green-700: #6bcf8c;
+
+  /* 警告/不足 */
+  --color-red-50: #351d1b;
+  --color-red-100: #3a201d;
+  --color-red-200: #562a27;
+  --color-red-500: #ef8273;
+  --color-red-600: #ee7665;
+  --color-red-700: #f08a7a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  /* ブラウザ標準の左右端スワイプ（履歴の進む/戻る）を抑制 */
+  overscroll-behavior-x: none;
+  /* 向き変更時の自動ズーム（文字拡大）を防止し、常に最適な大きさで表示 */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* スマホ（縦持ち専用）：横向きになったら回転を促すオーバーレイを表示。
+   iPad（横向きでも高さが大きい）は対象外。 */
+.rotate-hint {
+  display: none;
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .rotate-hint {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 2rem;
+    text-align: center;
+    background: #191817;
+    color: #e0dbd2;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: #191817; /* ページ背景（パネルより暗い） */
+  color: #e0dbd2;
+  overflow-x: hidden; /* スワイプ戻し中のはみ出しを隠す */
+}
+
+#root {
+  min-height: 100svh;
+}
