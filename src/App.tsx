@@ -11,6 +11,7 @@ import IngredientsPage from './pages/IngredientsPage'
 import RecipesPage from './pages/RecipesPage'
 import MenuSettingsPage from './pages/MenuSettingsPage'
 import PrepPage from './pages/PrepPage'
+import TaxPage from './pages/TaxPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { to: '/ingredients', label: '食材', icon: '🥬' },
   { to: '/recipes', label: 'レシピ', icon: '📖' },
   { to: '/menus', label: 'メニュー', icon: '🍽️' },
+  { to: '/tax', label: '申告', icon: '🧾' },
 ]
 const BOTTOM_NAV = NAV_ITEMS.slice(0, 5)
 
@@ -105,6 +107,7 @@ export default function App() {
                   <Route path="/recipes" element={<RecipesPage />} />
                   <Route path="/menus" element={<MenuSettingsPage />} />
                   <Route path="/prep" element={<PrepPage />} />
+                  <Route path="/tax" element={<TaxPage />} />
                   <Route path="/setup" element={<SetupCheckPage />} />
                 </Routes>
               </div>

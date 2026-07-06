@@ -55,6 +55,9 @@ export async function fetchAccounts(type?: AccountType): Promise<Account[]> {
 export function useExpenseAccounts() {
   return useQuery({ queryKey: ['accounts', 'expense'], queryFn: () => fetchAccounts('expense'), staleTime: 5 * 60_000 })
 }
+export function useAllAccounts() {
+  return useQuery({ queryKey: ['accounts', 'all'], queryFn: () => fetchAccounts(), staleTime: 5 * 60_000 })
+}
 
 // ---------- 仕訳一覧 ----------
 
