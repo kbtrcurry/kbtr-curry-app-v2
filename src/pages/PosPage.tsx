@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../lib/auth'
 import { Spinner } from '../components/Spinner'
 import { usePersistedState } from '../lib/persistState'
@@ -12,7 +13,9 @@ import {
   addReceipt,
   voidReceipt,
   closeTodaySession,
+  type Menu,
 } from '../lib/pos'
+import { updateMenu } from '../lib/masterData'
 
 type CartItem = { menuId: string | null; name: string; price: number; qty: number }
 type ManualItem = { id: string; price: number }
@@ -48,6 +51,8 @@ export default function PosPage() {
   const { data: posSession } = useTodaySession()
   const { receipts, refresh } = useTodayReceipts(posSession?.id)
   const pendingCount = usePendingCount()
+  const queryClient = useQueryClient()
+  const [reordering, setReordering] = useState(false)
 
   const [qty, setQty] = usePersistedState<Record<string, number>>('kbtr_v2_pos_qty', {})
   const [manualItems, setManualItems] = usePersistedState<ManualItem[]>('kbtr_v2_pos_manual', [])
@@ -97,6 +102,27 @@ export default function PosPage() {
 
   const setCount = (menuId: string, delta: number) => {
     setQty((prev) => ({ ...prev, [menuId]: Math.max(0, (prev[menuId] ?? 0) + delta) }))
+  }
+
+  // メニューカードの並び替え（menus.sort_orderをDBで入れ替える）
+  const moveMenu = async (id: string, dir: -1 | 1) => {
+    const i = menus.findIndex((m) => m.id === id)
+    const j = i + dir
+    if (i < 0 || j < 0 || j >= menus.length) return
+    const a = menus[i]
+    const b = menus[j]
+    const swapped = [...menus]
+    swapped[i] = { ...b, sort_order: a.sort_order }
+    swapped[j] = { ...a, sort_order: b.sort_order }
+    queryClient.setQueryData<Menu[]>(['menus', 'active'], swapped)
+    try {
+      await Promise.all([
+        updateMenu(a.id, { sort_order: b.sort_order }),
+        updateMenu(b.id, { sort_order: a.sort_order }),
+      ])
+    } finally {
+      void queryClient.invalidateQueries({ queryKey: ['menus'] })
+    }
   }
 
   const cart: CartItem[] = [
@@ -360,11 +386,23 @@ export default function PosPage() {
     <div className="p-4 pb-40">
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-2xl font-bold text-amber-800">🛒 レジ</h1>
-        {pendingCount > 0 && (
-          <span className="text-xs text-amber-600 border border-amber-300 rounded-full px-2 py-0.5">
-            未送信 {pendingCount} 件
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {pendingCount > 0 && (
+            <span className="text-xs text-amber-600 border border-amber-300 rounded-full px-2 py-0.5">
+              未送信 {pendingCount} 件
+            </span>
+          )}
+          <button
+            onClick={() => setReordering((v) => !v)}
+            className={`text-sm border rounded-lg px-2 py-1 active:opacity-80 ${
+              reordering
+                ? 'bg-amber-700 text-[#faf9f5] border-amber-700 font-semibold'
+                : 'text-stone-500 border-stone-200'
+            }`}
+          >
+            {reordering ? '完了' : '↕ 並び替え'}
+          </button>
+        </div>
       </div>
 
       <div className="bg-stone-50 rounded-lg px-3 py-2 mb-4 space-y-2">
@@ -427,8 +465,41 @@ export default function PosPage() {
         </p>
       )}
 
+      {reordering && (
+        <p className="text-xs text-stone-500 mb-2">◀ ▶ でボタンの並び順を入れ替えできます。終わったら「完了」。</p>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {menus.map((m) => {
+        {menus.map((m, i) => {
+          if (reordering) {
+            return (
+              <div
+                key={m.id}
+                className="rounded-2xl border-2 border-amber-300 bg-amber-50/40 flex flex-col overflow-hidden"
+              >
+                <div className="p-3 flex-1">
+                  <p className="font-bold text-stone-900 leading-snug">{m.name}</p>
+                  <p className="text-amber-800 font-bold mt-1">¥{m.price.toLocaleString()}</p>
+                </div>
+                <div className="flex border-t-2 border-amber-200">
+                  <button
+                    onClick={() => void moveMenu(m.id, -1)}
+                    disabled={i === 0}
+                    className="flex-1 py-3 text-xl font-bold text-stone-600 active:bg-stone-100 disabled:opacity-20"
+                  >
+                    ◀
+                  </button>
+                  <button
+                    onClick={() => void moveMenu(m.id, 1)}
+                    disabled={i === menus.length - 1}
+                    className="flex-1 py-3 text-xl font-bold text-stone-600 active:bg-stone-100 border-l border-amber-200 disabled:opacity-20"
+                  >
+                    ▶
+                  </button>
+                </div>
+              </div>
+            )
+          }
           const count = qty[m.id] ?? 0
           return (
             <div
@@ -465,16 +536,18 @@ export default function PosPage() {
           )
         })}
 
-        <button
-          onClick={() => {
-            setManualOpen(true)
-            setManualVal('')
-          }}
-          className="rounded-2xl p-4 min-h-28 flex flex-col items-center justify-center border-2 border-dashed border-amber-400 text-amber-700 font-bold active:scale-95 transition-transform"
-        >
-          <span className="text-3xl">＋</span>
-          金額入力
-        </button>
+        {!reordering && (
+          <button
+            onClick={() => {
+              setManualOpen(true)
+              setManualVal('')
+            }}
+            className="rounded-2xl p-4 min-h-28 flex flex-col items-center justify-center border-2 border-dashed border-amber-400 text-amber-700 font-bold active:scale-95 transition-transform"
+          >
+            <span className="text-3xl">＋</span>
+            金額入力
+          </button>
+        )}
       </div>
 
       {manualItems.length > 0 && (

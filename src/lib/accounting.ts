@@ -4,6 +4,7 @@
 // + journal_lines)が自動生成される。ここでは取得・集計・フォーム送信のみを扱う。
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
+import { fetchAllPages } from './supabasePaging'
 
 export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense'
 export type Segment = { id: string; code: string; name: string; sort_order: number }
@@ -65,16 +66,19 @@ const JOURNAL_SELECT =
   'id, entry_date, description, segment_id, source_type, source_id, created_at, ' +
   'segments(code, name), journal_lines(id, account_id, side, amount, memo, accounts(code, name, type))'
 
+// 年間の仕訳数が1000件を超える運用も想定し range() でページング取得する
 export async function fetchJournalEntries(range: { from: string; to: string }): Promise<JournalEntry[]> {
-  const { data, error } = await supabase
-    .from('journal_entries')
-    .select(JOURNAL_SELECT)
-    .gte('entry_date', range.from)
-    .lte('entry_date', range.to)
-    .order('entry_date', { ascending: false })
-    .order('created_at', { ascending: false })
-  if (error) throw error
-  return (data ?? []) as unknown as JournalEntry[]
+  return fetchAllPages<JournalEntry>(
+    (from, to) =>
+      supabase
+        .from('journal_entries')
+        .select(JOURNAL_SELECT)
+        .gte('entry_date', range.from)
+        .lte('entry_date', range.to)
+        .order('entry_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(from, to) as unknown as PromiseLike<{ data: JournalEntry[] | null; error: { message: string } | null }>,
+  )
 }
 
 export function useJournalEntries(range: { from: string; to: string }) {

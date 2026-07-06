@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { useRegisterBack } from '../lib/backHandler'
 import { Spinner } from '../components/Spinner'
+import { ConfirmModal } from '../components/ConfirmModal'
 import { useIngredients } from '../lib/masterData'
+import { getRecent, pushRecent, RECENT_KEYS, RECENT_LABEL } from '../lib/recent'
+import { usePersistedState } from '../lib/persistState'
 import {
   useRecipes,
   useRecipeIngredients,
@@ -23,7 +26,7 @@ import {
   type RecipeIngredientRow,
 } from '../lib/masterData'
 
-const RECENT_LABEL = 'すべて'
+const ALL_LABEL = 'すべて'
 
 function str(v: number | null | undefined): string {
   return v != null ? String(v) : ''
@@ -42,7 +45,8 @@ export default function RecipesPage() {
   const invalidate = useInvalidateMasterData()
 
   const [search, setSearch] = useState('')
-  const [cat, setCat] = useState<string>(RECENT_LABEL)
+  const [cat, setCat] = usePersistedState<string>('kbtr_view_recipe_cat', RECENT_LABEL)
+  const [recent, setRecent] = useState<string[]>(() => getRecent(RECENT_KEYS.recipe))
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const { data: items = [], isLoading: itemsLoading } = useRecipeIngredients(selectedId)
 
@@ -55,6 +59,8 @@ export default function RecipesPage() {
   const [deleting, setDeleting] = useState(false)
   const [picking, setPicking] = useState(false)
   const [pickerSearch, setPickerSearch] = useState('')
+  const [confirmDeleteRecipe, setConfirmDeleteRecipe] = useState(false)
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState<RecipeIngredientRow | null>(null)
 
   const [salePrice, setSalePrice] = useState('')
   const [totalWeight, setTotalWeight] = useState('')
@@ -77,6 +83,7 @@ export default function RecipesPage() {
   const selected = recipes.find((r) => r.id === selectedId) ?? null
 
   const openRecipe = (r: Recipe) => {
+    setRecent(pushRecent(RECENT_KEYS.recipe, r.name))
     setSelectedId(r.id)
     setSalePrice(str(r.sale_price))
     setTotalWeight(str(r.yield_g))
@@ -153,7 +160,6 @@ export default function RecipesPage() {
 
   const removeRecipe = async () => {
     if (!selected) return
-    if (!confirm(`「${selected.name}」を削除しますか？\n食材明細も削除されます。元に戻せません。`)) return
     setDeleting(true)
     setError(null)
     try {
@@ -179,7 +185,6 @@ export default function RecipesPage() {
   }
 
   const removeItem = async (item: RecipeIngredientRow) => {
-    if (!confirm(`「${item.ingredients.name}」を削除しますか？`)) return
     try {
       await deleteRecipeIngredient(item.id)
       invalidate()
@@ -207,9 +212,11 @@ export default function RecipesPage() {
 
   const listed = search
     ? recipes.filter((r) => r.name.includes(search)).slice(0, 50)
-    : cat === RECENT_LABEL
+    : cat === ALL_LABEL
       ? recipes
-      : recipes.filter((r) => (r.dish_type || 'その他') === cat)
+      : cat === RECENT_LABEL
+        ? recent.map((n) => recipes.find((r) => r.name === n)).filter((r): r is Recipe => !!r)
+        : recipes.filter((r) => (r.dish_type || 'その他') === cat)
 
   const rows = items.map((it) => {
     const per = ingredientPricePerG(it.ingredients) ?? 0
@@ -342,7 +349,7 @@ export default function RecipesPage() {
 
           {!search && (
             <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 -mx-1 px-1">
-              {[RECENT_LABEL, ...typeTabs].map((t) => (
+              {[RECENT_LABEL, ALL_LABEL, ...typeTabs].map((t) => (
                 <button
                   key={t}
                   onClick={() => setCat(t)}
@@ -399,7 +406,7 @@ export default function RecipesPage() {
                 ✏️ 名前変更
               </button>
               <button
-                onClick={removeRecipe}
+                onClick={() => setConfirmDeleteRecipe(true)}
                 disabled={deleting}
                 className="text-xs border border-red-200 rounded-lg px-2 py-1 text-red-500 disabled:opacity-40"
               >
@@ -462,7 +469,7 @@ export default function RecipesPage() {
                     className="w-16 border border-stone-300 rounded px-1.5 py-1.5 text-right text-base outline-none focus:border-amber-400"
                   />
                   <span className="w-10 text-center text-sm text-stone-500">{r.unit}</span>
-                  <button onClick={() => removeItem(r)} className="text-stone-300 text-xl px-1 shrink-0" aria-label="削除">
+                  <button onClick={() => setConfirmDeleteItem(r)} className="text-stone-300 text-xl px-1 shrink-0" aria-label="削除">
                     ×
                   </button>
                 </div>
@@ -572,6 +579,29 @@ export default function RecipesPage() {
             )}
           </div>
         </>
+      )}
+
+      {confirmDeleteRecipe && selected && (
+        <ConfirmModal
+          message={`「${selected.name}」を削除しますか？\n食材明細も削除されます。元に戻せません。`}
+          onConfirm={() => {
+            setConfirmDeleteRecipe(false)
+            void removeRecipe()
+          }}
+          onCancel={() => setConfirmDeleteRecipe(false)}
+        />
+      )}
+
+      {confirmDeleteItem && (
+        <ConfirmModal
+          message={`「${confirmDeleteItem.ingredients.name}」を削除しますか？`}
+          onConfirm={() => {
+            const item = confirmDeleteItem
+            setConfirmDeleteItem(null)
+            void removeItem(item)
+          }}
+          onCancel={() => setConfirmDeleteItem(null)}
+        />
       )}
     </div>
   )

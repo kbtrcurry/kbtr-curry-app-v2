@@ -2,6 +2,7 @@
 // 食材単価は税抜で保存し、原価計算時にのみ TAX を掛けて税込に換算する（v1と同じ規約）。
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
+import { fetchAllPages } from './supabasePaging'
 
 export const TAX = 1.08 // 軽減税率8%
 
@@ -177,10 +178,15 @@ export function useRecipeIngredients(recipeId: string | null) {
 }
 
 // 全レシピ分の食材明細を一括取得（メニュー設定・仕込み計画での原価計算に使う）
+// 4000行超あるため range() でページング取得しないと後半のレシピが無言で欠落する
 export async function fetchAllRecipeIngredients(): Promise<RecipeIngredientRow[]> {
-  const { data, error } = await supabase.from('recipe_ingredients').select(RECIPE_INGREDIENTS_SELECT)
-  if (error) throw error
-  return (data ?? []) as unknown as RecipeIngredientRow[]
+  return fetchAllPages<RecipeIngredientRow>(
+    (from, to) =>
+      supabase.from('recipe_ingredients').select(RECIPE_INGREDIENTS_SELECT).range(from, to) as unknown as PromiseLike<{
+        data: RecipeIngredientRow[] | null
+        error: { message: string } | null
+      }>,
+  )
 }
 export function useAllRecipeIngredients() {
   return useQuery({ queryKey: ['recipe_ingredients', 'all'], queryFn: fetchAllRecipeIngredients, staleTime: 30_000 })

@@ -14,6 +14,7 @@ import {
   type Ingredient,
   type IngredientPurchase,
 } from '../lib/masterData'
+import { getRecent, pushRecent, RECENT_KEYS, RECENT_LABEL } from '../lib/recent'
 
 type FieldKey = 'pack_weight_g' | 'pack_price' | 'stock_g' | 'alert_threshold_g'
 
@@ -37,7 +38,8 @@ export default function IngredientsPage() {
   const invalidate = useInvalidateMasterData()
 
   const [search, setSearch] = useState('')
-  const [cat, setCat] = useState<string | null>(null)
+  const [cat, setCat] = useState<string | null>(RECENT_LABEL)
+  const [recent, setRecent] = useState<string[]>(() => getRecent(RECENT_KEYS.ingredient))
   const [onlyUnset, setOnlyUnset] = useState(false)
   const [onlyAlert, setOnlyAlert] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -96,6 +98,7 @@ export default function IngredientsPage() {
       }
       await updateIngredient(ing.id, patch)
       invalidate()
+      setRecent(pushRecent(RECENT_KEYS.ingredient, ing.name))
       clearEdit(ing.id, field)
       setSavedId(ing.id)
       setTimeout(() => setSavedId(null), 1500)
@@ -168,11 +171,17 @@ export default function IngredientsPage() {
       .map(([k]) => k)
   })()
 
-  const filtered = list
+  const byCategory =
+    search || cat === null
+      ? list
+      : cat === RECENT_LABEL
+        ? (recent.map((n) => list.find((x) => x.name === n)).filter((x): x is Ingredient => !!x))
+        : list.filter((x) => (x.category || 'その他') === cat)
+
+  const filtered = byCategory
     .filter((x) => (search ? x.name.includes(search) : true))
     .filter((x) => (onlyUnset ? ingredientPricePerG(x) === null : true))
     .filter((x) => (onlyAlert ? isLowStock(x) : true))
-    .filter((x) => (search || cat === null ? true : (x.category || 'その他') === cat))
 
   const unsetCount = list.filter((x) => ingredientPricePerG(x) === null).length
   const alertCount = list.filter(isLowStock).length
@@ -296,6 +305,14 @@ export default function IngredientsPage() {
 
       {!search && (
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-1 -mx-1 px-1">
+          <button
+            onClick={() => setCat(RECENT_LABEL)}
+            className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold ${
+              cat === RECENT_LABEL ? 'bg-amber-700 text-[#faf9f5]' : 'bg-stone-200 text-stone-700'
+            }`}
+          >
+            {RECENT_LABEL}
+          </button>
           <button
             onClick={() => setCat(null)}
             className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold ${

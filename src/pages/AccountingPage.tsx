@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { Spinner } from '../components/Spinner'
+import { ConfirmModal } from '../components/ConfirmModal'
 import {
   useSegments,
   useExpenseAccounts,
@@ -168,6 +169,7 @@ function ExpenseTab({
   const [memo, setMemo] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<JournalEntry | null>(null)
 
   const segId = segmentId || segments.find((s) => s.code === 'common')?.id || segments[0]?.id || ''
   const acctId = accountId || accounts[0]?.id || ''
@@ -321,12 +323,24 @@ function ExpenseTab({
               </p>
             </div>
             <span className="font-bold text-stone-900 shrink-0">¥{entryTotal(e, 'debit').toLocaleString()}</span>
-            <button onClick={() => void remove(e.id)} className="text-red-400 shrink-0" title="削除">
+            <button onClick={() => setConfirmTarget(e)} className="text-red-400 shrink-0" title="削除">
               🗑️
             </button>
           </div>
         ))}
       </div>
+
+      {confirmTarget && (
+        <ConfirmModal
+          message={`${confirmTarget.entry_date} の経費「${confirmTarget.description || '記録'}」を削除しますか？\n（元に戻せません）`}
+          onConfirm={() => {
+            const id = confirmTarget.id
+            setConfirmTarget(null)
+            void remove(id)
+          }}
+          onCancel={() => setConfirmTarget(null)}
+        />
+      )}
     </div>
   )
 }
@@ -353,6 +367,7 @@ function RevenueTab({
   const [memo, setMemo] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<JournalEntry | null>(null)
 
   const segId = segmentId || segments[0]?.id || ''
   const grossNum = Number(gross) || 0
@@ -498,12 +513,24 @@ function RevenueTab({
               {e.description && <p className="text-sm text-stone-800 truncate">{e.description}</p>}
             </div>
             <span className="font-bold text-stone-900 shrink-0">¥{entryTotal(e, 'credit').toLocaleString()}</span>
-            <button onClick={() => void remove(e.id)} className="text-red-400 shrink-0" title="削除">
+            <button onClick={() => setConfirmTarget(e)} className="text-red-400 shrink-0" title="削除">
               🗑️
             </button>
           </div>
         ))}
       </div>
+
+      {confirmTarget && (
+        <ConfirmModal
+          message={`${confirmTarget.entry_date} の収入登録「${confirmTarget.description || '記録'}」を削除しますか？\n（元に戻せません）`}
+          onConfirm={() => {
+            const id = confirmTarget.id
+            setConfirmTarget(null)
+            void remove(id)
+          }}
+          onCancel={() => setConfirmTarget(null)}
+        />
+      )}
     </div>
   )
 }
@@ -511,8 +538,9 @@ function RevenueTab({
 // ---------- 仕訳一覧 ----------
 
 function LedgerTab({ entries, onSaved }: { entries: JournalEntry[]; onSaved: () => void }) {
-  const remove = async (entryId: string, sourceType: JournalEntry['source_type']) => {
-    if (sourceType === 'pos_close') return
+  const [confirmTarget, setConfirmTarget] = useState<JournalEntry | null>(null)
+
+  const remove = async (entryId: string) => {
     await deleteJournalEntry(entryId)
     onSaved()
   }
@@ -529,7 +557,7 @@ function LedgerTab({ entries, onSaved }: { entries: JournalEntry[]; onSaved: () 
               <SourceBadge sourceType={e.source_type} />
             </div>
             {e.source_type !== 'pos_close' && (
-              <button onClick={() => void remove(e.id, e.source_type)} className="text-red-400 shrink-0" title="削除">
+              <button onClick={() => setConfirmTarget(e)} className="text-red-400 shrink-0" title="削除">
                 🗑️
               </button>
             )}
@@ -548,6 +576,18 @@ function LedgerTab({ entries, onSaved }: { entries: JournalEntry[]; onSaved: () 
           </div>
         </div>
       ))}
+
+      {confirmTarget && (
+        <ConfirmModal
+          message={`${confirmTarget.entry_date} の仕訳「${confirmTarget.description || confirmTarget.segments.name}」を削除しますか？\n（元に戻せません）`}
+          onConfirm={() => {
+            const id = confirmTarget.id
+            setConfirmTarget(null)
+            void remove(id)
+          }}
+          onCancel={() => setConfirmTarget(null)}
+        />
+      )}
     </div>
   )
 }

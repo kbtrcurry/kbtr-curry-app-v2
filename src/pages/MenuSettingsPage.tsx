@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { Spinner } from '../components/Spinner'
+import { ConfirmModal } from '../components/ConfirmModal'
 import {
   useAllMenus,
   useAllMenuComponents,
@@ -34,6 +35,7 @@ export default function MenuSettingsPage() {
   const [servEdit, setServEdit] = useState<Record<string, string>>({})
   const [pickerMenuId, setPickerMenuId] = useState<string | null>(null)
   const [pickerSearch, setPickerSearch] = useState('')
+  const [confirmTarget, setConfirmTarget] = useState<Menu | null>(null)
 
   const componentsByMenu = (menuId: string): MenuComponentRow[] => components.filter((c) => c.menu_id === menuId)
 
@@ -85,7 +87,6 @@ export default function MenuSettingsPage() {
   }
 
   const removeMenu = async (menu: Menu) => {
-    if (!confirm(`「${menu.name}」を削除しますか？`)) return
     setError(null)
     try {
       await deleteMenu(menu.id)
@@ -181,7 +182,7 @@ export default function MenuSettingsPage() {
                 >
                   {m.active ? 'ON' : 'OFF'}
                 </button>
-                <button onClick={() => removeMenu(m)} className="text-stone-300 text-xl px-1 shrink-0" aria-label="削除">
+                <button onClick={() => setConfirmTarget(m)} className="text-stone-300 text-xl px-1 shrink-0" aria-label="削除">
                   ×
                 </button>
               </div>
@@ -285,6 +286,18 @@ export default function MenuSettingsPage() {
           ＋ メニューを追加
         </button>
       </div>
+
+      {confirmTarget && (
+        <ConfirmModal
+          message={`「${confirmTarget.name}」を削除しますか？`}
+          onConfirm={() => {
+            const menu = confirmTarget
+            setConfirmTarget(null)
+            void removeMenu(menu)
+          }}
+          onCancel={() => setConfirmTarget(null)}
+        />
+      )}
     </div>
   )
 }

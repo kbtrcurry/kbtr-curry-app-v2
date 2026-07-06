@@ -8,10 +8,12 @@ import {
   RECIPE_TYPES,
 } from '../lib/masterData'
 import { useIngredients } from '../lib/masterData'
+import { getRecent, pushRecent, RECENT_KEYS, RECENT_LABEL } from '../lib/recent'
+import { usePersistedState } from '../lib/persistState'
 
 type PrepItem = { recipeId: string; mult: string }
 const PREP_KEY = 'kbtr_v2_prep'
-const RECENT_LABEL = 'すべて'
+const ALL_LABEL = 'すべて'
 
 function fmt(x: number): string {
   return (Math.round(x * 10) / 10).toLocaleString()
@@ -27,7 +29,8 @@ export default function PrepPage() {
   for (const i of ingredients) stockByName[i.name] = i.stock_g
 
   const [search, setSearch] = useState('')
-  const [cat, setCat] = useState<string>(RECENT_LABEL)
+  const [cat, setCat] = usePersistedState<string>('kbtr_view_prep_cat', RECENT_LABEL)
+  const [recent, setRecent] = useState<string[]>(() => getRecent(RECENT_KEYS.prep))
   const [subTab, setSubTab] = useState<'shopping' | 'recipes'>('shopping')
   const [selected, setSelected] = useState<PrepItem[]>(() => {
     try {
@@ -43,6 +46,8 @@ export default function PrepPage() {
   }, [])
 
   const addRecipe = (recipeId: string) => {
+    const r = recipes.find((x) => x.id === recipeId)
+    if (r) setRecent(pushRecent(RECENT_KEYS.prep, r.name))
     if (selected.some((s) => s.recipeId === recipeId)) return
     persist([...selected, { recipeId, mult: '1' }])
     setSearch('')
@@ -83,9 +88,11 @@ export default function PrepPage() {
   const listed = (
     search
       ? recipes.filter((r) => r.name.includes(search)).slice(0, 50)
-      : cat === RECENT_LABEL
+      : cat === ALL_LABEL
         ? recipes
-        : recipes.filter((r) => (r.dish_type || 'その他') === cat)
+        : cat === RECENT_LABEL
+          ? recent.map((n) => recipes.find((r) => r.name === n)).filter((r): r is (typeof recipes)[number] => !!r)
+          : recipes.filter((r) => (r.dish_type || 'その他') === cat)
   ).filter((r) => !selectedIds.has(r.id))
 
   if (authLoading) return <Spinner />
@@ -233,7 +240,7 @@ export default function PrepPage() {
           />
           {!search && (
             <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 -mx-1 px-1">
-              {[RECENT_LABEL, ...typeTabs].map((t) => (
+              {[RECENT_LABEL, ALL_LABEL, ...typeTabs].map((t) => (
                 <button
                   key={t}
                   onClick={() => setCat(t)}
