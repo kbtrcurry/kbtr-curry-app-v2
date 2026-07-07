@@ -29,7 +29,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'pnl', label: 'セグメント別P&L' },
 ]
 
-const PLATFORM_SEGMENT_CODES = ['note', 'youtube']
+const PLATFORM_SEGMENT_CODES = ['note', 'youtube', 'amazon']
 
 function shiftMonth(yearMonth: string, delta: number): string {
   const [y, m] = yearMonth.split('-').map(Number)

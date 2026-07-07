@@ -28,7 +28,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'check', label: '年次チェック' },
 ]
 
-const PLATFORM_SEGMENT_CODES = ['note', 'youtube']
+const PLATFORM_SEGMENT_CODES = ['note', 'youtube', 'amazon']
 
 function YearSwitcher({ year, onChange }: { year: number; onChange: (y: number) => void }) {
   return (

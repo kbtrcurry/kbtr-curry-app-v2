@@ -7,6 +7,7 @@ insert into segments (code, name, sort_order) values
   ('event',   'イベント・ケータリング', 2),
   ('note',    'note',                  3),
   ('youtube', 'YouTube',               4),
+  ('amazon',  'Amazon',                5),
   ('common',  '共通',                  9);
 
 -- 資産・負債・純資産
