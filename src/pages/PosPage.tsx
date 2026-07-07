@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ShoppingCart, Trash2, Check } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { Spinner } from '../components/Spinner'
+import { Modal } from '../components/Modal'
 import { usePersistedState } from '../lib/persistState'
 import { useKeyboardOffset } from '../lib/useKeyboardOffset'
 import { useRegisterBack } from '../lib/backHandler'
@@ -591,8 +592,8 @@ export default function PosPage() {
       )}
 
       {manualOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
-          <div className="bg-white w-full max-w-sm rounded-t-2xl md:rounded-2xl p-5">
+        <Modal onClose={() => setManualOpen(false)}>
+          <div className="bg-white w-full max-w-sm rounded-2xl p-5">
             <h2 className="text-lg font-bold text-stone-900 mb-2">金額を入力</h2>
             <div className="rounded-xl border-2 border-amber-400 p-4 mb-3 text-right">
               <span className="text-4xl font-bold text-stone-900">
@@ -616,13 +617,13 @@ export default function PosPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {closing && (
-        <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 md:p-4">
+        <Modal onClose={() => { setClosing(false); setCloseError(null) }}>
           <div
-            className="bg-white w-full max-w-lg rounded-t-2xl md:rounded-2xl pt-5 px-5 space-y-4 overflow-y-auto max-h-[90svh]"
+            className="bg-white w-full max-w-lg rounded-2xl pt-5 px-5 space-y-4 overflow-y-auto max-h-[90svh]"
             style={{ paddingBottom: Math.max(20, kbOffset + 20) }}
           >
             <h2 className="text-lg font-bold text-stone-900">本日の締め</h2>
@@ -709,7 +710,7 @@ export default function PosPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

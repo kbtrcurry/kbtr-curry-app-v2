@@ -96,7 +96,7 @@ function Layout({ children }: { children: ReactNode }) {
         <span className="text-xs text-stone-400">v{__APP_VERSION__}.{__BUILD_DATE__}</span>
       </header>
 
-      <aside className="hidden md:flex md:flex-col md:w-52 lg:w-60 shrink-0 border-r border-stone-200 sticky top-0 h-svh">
+      <aside className="hidden md:flex md:flex-col md:w-52 lg:w-60 shrink-0 border-r border-stone-200 md:fixed md:inset-y-0 md:left-0 h-svh z-30">
         <div className="px-4 py-4 text-lg font-bold text-amber-800 flex items-center gap-2">
           <UpdateButton />
           コバタロカレー v2
@@ -121,7 +121,7 @@ function Layout({ children }: { children: ReactNode }) {
         </nav>
       </aside>
 
-      <main className="flex-1 min-w-0 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-10">{children}</main>
+      <main className="flex-1 min-w-0 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-10 md:ml-52 lg:ml-60">{children}</main>
 
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 flex z-40"

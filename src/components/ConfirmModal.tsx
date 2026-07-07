@@ -1,3 +1,5 @@
+import { Modal } from './Modal'
+
 type Props = {
   message: string
   onConfirm: () => void
@@ -6,7 +8,7 @@ type Props = {
 
 export function ConfirmModal({ message, onConfirm, onCancel }: Props) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+    <Modal onClose={onCancel}>
       <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
         <p className="text-stone-800 text-sm mb-6 whitespace-pre-wrap">{message}</p>
         <div className="flex gap-3">
@@ -24,6 +26,6 @@ export function ConfirmModal({ message, onConfirm, onCancel }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }

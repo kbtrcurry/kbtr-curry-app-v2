@@ -5,6 +5,7 @@ import { Pencil, Trash2, Plus, BarChart3 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { Spinner } from '../components/Spinner'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { Modal } from '../components/Modal'
 import {
   useClosedSessions,
   useReceiptLines,
@@ -674,8 +675,8 @@ export default function DashboardPage() {
           const s = sessions.find((x) => x.id === editSessionId)
           if (!s) return null
           return (
-            <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
-              <div className="bg-white w-full max-w-lg rounded-t-2xl md:rounded-2xl p-5 space-y-3 overflow-y-auto max-h-[90svh]">
+            <Modal onClose={() => setEditSessionId(null)}>
+              <div className="bg-white w-full max-w-lg rounded-2xl p-5 space-y-3 overflow-y-auto max-h-[90svh]">
                 <h2 className="text-lg font-bold text-stone-900">{s.session_date} を編集</h2>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -755,7 +756,7 @@ export default function DashboardPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           )
         })()}
 
@@ -764,8 +765,8 @@ export default function DashboardPage() {
           const s = sessions.find((x) => x.id === menuEditId)
           if (!s) return null
           return (
-            <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
-              <div className="bg-white w-full max-w-lg rounded-t-2xl md:rounded-2xl p-5 space-y-3 overflow-y-auto max-h-[90svh]">
+            <Modal onClose={() => setMenuEditId(null)}>
+              <div className="bg-white w-full max-w-lg rounded-2xl p-5 space-y-3 overflow-y-auto max-h-[90svh]">
                 <h2 className="text-lg font-bold text-stone-900">{s.session_date} のメニュー別を編集</h2>
                 <div className="space-y-1.5">
                   {menuEditRows.map((m, i) => (
@@ -833,7 +834,7 @@ export default function DashboardPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           )
         })()}
     </div>
