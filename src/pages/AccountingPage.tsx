@@ -57,6 +57,20 @@ function MonthSwitcher({ yearMonth, onChange }: { yearMonth: string; onChange: (
   )
 }
 
+// 横棒グラフの1行（ラベル・バー・金額）
+function BarRow({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.min(100, Math.max(value !== 0 ? 2 : 0, (Math.abs(value) / max) * 100)) : 0
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="w-20 shrink-0 truncate text-stone-500">{label}</span>
+      <div className="flex-1 h-4 bg-stone-100 rounded overflow-hidden">
+        <div className="h-full rounded transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <span className="w-24 shrink-0 text-right font-mono font-semibold text-stone-800">¥{value.toLocaleString()}</span>
+    </div>
+  )
+}
+
 function SourceBadge({ sourceType }: { sourceType: JournalEntry['source_type'] }) {
   const label = {
     pos_close: 'レジ締め',
@@ -206,8 +220,29 @@ function ExpenseTab({
     onSaved()
   }
 
+  const categoryTotals = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const e of entries) {
+      const name = e.journal_lines.find((l) => l.side === 'debit')?.accounts.name ?? 'その他'
+      map[name] = (map[name] ?? 0) + entryTotal(e, 'debit')
+    }
+    return Object.entries(map)
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount)
+  }, [entries])
+  const categoryMax = Math.max(1, ...categoryTotals.map((c) => c.amount))
+
   return (
     <div className="space-y-5">
+      {categoryTotals.length > 0 && (
+        <div className="bg-white border border-stone-200 rounded-2xl p-4 space-y-2">
+          <p className="text-sm font-bold text-stone-700 mb-1">科目別の内訳</p>
+          {categoryTotals.map((c) => (
+            <BarRow key={c.name} label={c.name} value={c.amount} max={categoryMax} color="#c96a40" />
+          ))}
+        </div>
+      )}
+
       <div className="bg-white border border-stone-200 rounded-2xl p-4 space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -603,49 +638,36 @@ function PnlTab({ pnl }: { pnl: { segmentCode: string; segmentName: string; reve
     (acc, p) => ({ revenue: acc.revenue + p.revenue, expense: acc.expense + p.expense, profit: acc.profit + p.profit }),
     { revenue: 0, expense: 0, profit: 0 },
   )
+  const maxVal = Math.max(
+    1,
+    ...pnl.map((p) => p.revenue),
+    ...pnl.map((p) => p.expense),
+    ...pnl.map((p) => Math.abs(p.profit)),
+    total.revenue,
+    total.expense,
+    Math.abs(total.profit),
+  )
 
   return (
     <div className="space-y-2">
       {pnl.length === 0 && <p className="text-center text-stone-400 text-sm py-4">この月のデータはまだありません</p>}
       {pnl.map((p) => (
         <div key={p.segmentCode} className="bg-white border border-stone-200 rounded-xl px-4 py-3">
-          <p className="font-bold text-stone-900 mb-1.5">{p.segmentName}</p>
-          <div className="grid grid-cols-3 gap-2 text-sm">
-            <div>
-              <p className="text-stone-400">売上</p>
-              <p className="font-semibold text-stone-800">¥{p.revenue.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-stone-400">経費</p>
-              <p className="font-semibold text-stone-800">¥{p.expense.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-stone-400">利益</p>
-              <p className={`font-bold ${p.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                ¥{p.profit.toLocaleString()}
-              </p>
-            </div>
+          <p className="font-bold text-stone-900 mb-2">{p.segmentName}</p>
+          <div className="space-y-1">
+            <BarRow label="売上" value={p.revenue} max={maxVal} color="#d9824f" />
+            <BarRow label="経費" value={p.expense} max={maxVal} color="#c96a40" />
+            <BarRow label="利益" value={p.profit} max={maxVal} color={p.profit >= 0 ? '#5cc07d' : '#ef8273'} />
           </div>
         </div>
       ))}
       {pnl.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mt-3">
-          <p className="font-bold text-amber-900 mb-1.5">全体合計</p>
-          <div className="grid grid-cols-3 gap-2 text-sm">
-            <div>
-              <p className="text-amber-600">売上</p>
-              <p className="font-semibold text-amber-900">¥{total.revenue.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-amber-600">経費</p>
-              <p className="font-semibold text-amber-900">¥{total.expense.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-amber-600">利益</p>
-              <p className={`font-bold ${total.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                ¥{total.profit.toLocaleString()}
-              </p>
-            </div>
+          <p className="font-bold text-amber-900 mb-2">全体合計</p>
+          <div className="space-y-1">
+            <BarRow label="売上" value={total.revenue} max={maxVal} color="#d9824f" />
+            <BarRow label="経費" value={total.expense} max={maxVal} color="#c96a40" />
+            <BarRow label="利益" value={total.profit} max={maxVal} color={total.profit >= 0 ? '#5cc07d' : '#ef8273'} />
           </div>
         </div>
       )}

@@ -30,7 +30,6 @@ import {
 import { usePersistedState } from '../lib/persistState'
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString()}`
-type DashTab = 'summary' | 'products' | 'prep'
 
 type SumPeriod = 'month' | '4w' | '3m' | '6m' | '1y'
 const SUM_PERIODS: { key: SumPeriod; label: string; days: number | null }[] = [
@@ -43,16 +42,6 @@ const SUM_PERIODS: { key: SumPeriod; label: string; days: number | null }[] = [
 const thisMonth = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
-type Period = 'all' | 'last4' | 'last8'
-
-type Rank = 'star' | 'plow' | 'puzzle' | 'dog'
-const RANK_META: Record<Rank, { label: string; cls: string }> = {
-  star: { label: '看板', cls: 'bg-green-100 text-green-700' },
-  plow: { label: '集客', cls: 'bg-amber-100 text-amber-800' },
-  puzzle: { label: '隠れ', cls: 'bg-stone-200 text-stone-700' },
-  dog: { label: '見直し', cls: 'bg-red-100 text-red-600' },
 }
 
 const peopleOf = (s: ClosedSession) => (s.people > 0 ? s.people : s.groups)
@@ -68,11 +57,8 @@ export default function DashboardPage() {
   const queryClient = useQueryClient()
   const menuIdByName = useMemo(() => new Map(allMenus.map((m) => [m.name, m.id])), [allMenus])
 
-  const [dashTab, setDashTab] = useState<DashTab>('summary')
   const [sumPeriod, setSumPeriod] = useState<SumPeriod>('month')
-  const [period, setPeriod] = useState<Period>('all')
   const [openId, setOpenId] = useState<string | null>(null)
-  const [targetInput, setTargetInput] = useState('')
 
   // 取り置き特典に使うレシピは設定タブで選択する（同じキーをここでも読むだけ）
   const [toriokiRecipeId] = usePersistedState('kbtr_v2_torioki_recipe', '')
@@ -240,84 +226,6 @@ export default function DashboardPage() {
     return map
   }, [lines])
 
-  // ── 商品別 ──
-  const eventDates = [...new Set(sortedSessions.map((s) => s.session_date))]
-  const periodSessionIds = (() => {
-    if (period === 'all') return new Set(sessions.map((s) => s.id))
-    const n = period === 'last4' ? 4 : 8
-    return new Set(sortedSessions.slice(0, n).map((s) => s.id))
-  })()
-  const periodLines = lines.filter((l) => periodSessionIds.has(l.session_id))
-
-  const productRanked = useMemo(() => {
-    const map: Record<string, { name: string; qty: number; amount: number; menuId: string | null }> = {}
-    for (const l of periodLines) {
-      if (!map[l.name_snapshot]) map[l.name_snapshot] = { name: l.name_snapshot, qty: 0, amount: 0, menuId: l.menu_id }
-      map[l.name_snapshot].qty += l.qty
-      map[l.name_snapshot].amount += l.qty * l.unit_price
-    }
-    const items = Object.values(map).map((p) => {
-      const price = p.qty > 0 ? p.amount / p.qty : 0
-      const cost = p.menuId ? (costByMenuId[p.menuId] ?? 0) : 0
-      const margin = price > 0 ? (price - cost) / price : 0
-      const costRate = p.menuId && price > 0 ? (cost / price) * 100 : null
-      return { ...p, price, cost, margin, costRate }
-    })
-    const avgQty = items.length ? items.reduce((s, x) => s + x.qty, 0) / items.length : 0
-    const avgMargin = items.length ? items.reduce((s, x) => s + x.margin, 0) / items.length : 0
-    return items
-      .map((x) => {
-        const pop = x.qty >= avgQty
-        const prof = x.margin >= avgMargin
-        const rank: Rank = pop && prof ? 'star' : pop && !prof ? 'plow' : !pop && prof ? 'puzzle' : 'dog'
-        return { ...x, rank }
-      })
-      .sort((a, b) => b.amount - a.amount)
-  }, [periodLines, costByMenuId])
-  const totalAmount = productRanked.reduce((s, p) => s + p.amount, 0)
-  const totalQty = productRanked.reduce((s, p) => s + p.qty, 0)
-  const hasCostData = productRanked.some((p) => p.costRate != null)
-
-  // ── 仕込み予測 ──
-  const target = Math.max(0, parseInt(targetInput) || 0)
-  const prepCalc = useMemo(() => {
-    if (eventDates.length === 0) return null
-    const evts = eventDates.map((date) => {
-      const s = sessions.find((x) => x.session_date === date)
-      const dayLines = lines.filter((l) => s && l.session_id === s.id)
-      const menuQty: Record<string, number> = {}
-      for (const l of dayLines) menuQty[l.name_snapshot] = (menuQty[l.name_snapshot] ?? 0) + l.qty
-      return { date, groups: s?.groups ?? 0, menuQty }
-    })
-    const withGroups = evts.filter((e) => e.groups > 0)
-    const usePerGroup = withGroups.length >= 3
-    const allMenuNames = [...new Set(lines.map((l) => l.name_snapshot))]
-    const sufficient = evts.length >= 3
-    if (usePerGroup) {
-      const totalGroups = withGroups.reduce((s, e) => s + e.groups, 0)
-      return {
-        unit: '人',
-        sufficient,
-        items: allMenuNames
-          .map((name) => ({
-            name,
-            avg: totalGroups > 0 ? withGroups.reduce((s, e) => s + (e.menuQty[name] ?? 0), 0) / totalGroups : 0,
-          }))
-          .filter((x) => x.avg > 0)
-          .sort((a, b) => b.avg - a.avg),
-      }
-    }
-    const n = evts.length
-    return {
-      unit: '回平均',
-      sufficient,
-      items: allMenuNames
-        .map((name) => ({ name, avg: n > 0 ? evts.reduce((s, e) => s + (e.menuQty[name] ?? 0), 0) / n : 0 }))
-        .filter((x) => x.avg > 0)
-        .sort((a, b) => b.avg - a.avg),
-    }
-  }, [eventDates, sessions, lines])
-
   if (authLoading) return <Spinner />
   if (!authSession) {
     return (
@@ -356,23 +264,7 @@ export default function DashboardPage() {
 
       {hasData && (
         <>
-          <div className="flex border-b border-stone-200 mb-4">
-            {(['summary', 'products', 'prep'] as DashTab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setDashTab(t)}
-                className={`flex-1 py-2 text-xs sm:text-sm font-semibold transition-colors ${
-                  dashTab === t ? 'border-b-2 border-amber-600 text-amber-700' : 'text-stone-500'
-                }`}
-              >
-                {t === 'summary' ? 'サマリー' : t === 'products' ? '商品別' : '仕込み'}
-              </button>
-            ))}
-          </div>
-
-          {dashTab === 'summary' && (
-            <>
-              <div className="flex gap-1.5 mb-3 overflow-x-auto">
+          <div className="flex gap-1.5 mb-3 overflow-x-auto">
                 {SUM_PERIODS.map((p) => (
                   <button
                     key={p.key}
@@ -525,151 +417,6 @@ export default function DashboardPage() {
                   })}
                 </div>
               </Section>
-            </>
-          )}
-
-          {dashTab === 'products' && (
-            <div>
-              <div className="flex gap-1.5 mb-4">
-                {(['all', 'last4', 'last8'] as Period[]).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPeriod(p)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-semibold ${
-                      period === p ? 'bg-amber-700 text-[#faf9f5]' : 'bg-stone-100 text-stone-600'
-                    }`}
-                  >
-                    {p === 'all' ? '全期間' : p === 'last4' ? '直近4回' : '直近8回'}
-                  </button>
-                ))}
-              </div>
-
-              {productRanked.length === 0 ? (
-                <p className="text-center text-stone-400 text-sm py-8">データがありません</p>
-              ) : (
-                <>
-                  {hasCostData && (
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {(['star', 'plow', 'puzzle', 'dog'] as Rank[]).map((r) => (
-                        <span key={r} className={`text-xs px-2 py-0.5 rounded-full font-semibold ${RANK_META[r].cls}`}>
-                          {RANK_META[r].label}
-                        </span>
-                      ))}
-                      <span className="text-xs text-stone-400 self-center ml-1">売れ筋×利益で分類</span>
-                    </div>
-                  )}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-stone-200 text-stone-500 text-xs">
-                          <th className="text-left pb-2">商品名</th>
-                          <th className="text-right pb-2 pr-2">販売数</th>
-                          <th className="text-right pb-2 pr-2">売上</th>
-                          {hasCostData && <th className="text-right pb-2 pr-2">原価率</th>}
-                          <th className="text-right pb-2">構成比</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {productRanked.map((p) => (
-                          <tr key={p.name} className="border-b border-stone-100">
-                            <td className="py-2 pr-2 font-medium text-stone-800">
-                              <div className="flex items-center gap-1.5">
-                                {hasCostData && (
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0 ${RANK_META[p.rank].cls}`}>
-                                    {RANK_META[p.rank].label}
-                                  </span>
-                                )}
-                                <span className="truncate">{p.name}</span>
-                              </div>
-                            </td>
-                            <td className="py-2 pr-2 text-right text-stone-700">{p.qty}</td>
-                            <td className="py-2 pr-2 text-right text-stone-700">{yen(p.amount)}</td>
-                            {hasCostData && (
-                              <td className="py-2 pr-2 text-right text-stone-600">
-                                {p.costRate != null ? `${p.costRate.toFixed(0)}%` : '—'}
-                              </td>
-                            )}
-                            <td className="py-2 text-right">
-                              <span className="text-stone-500">{totalAmount > 0 ? Math.round((p.amount / totalAmount) * 100) : 0}%</span>
-                              <div className="h-1.5 bg-stone-100 rounded mt-0.5">
-                                <div
-                                  className="h-full bg-amber-500 rounded"
-                                  style={{ width: `${totalAmount > 0 ? (p.amount / totalAmount) * 100 : 0}%` }}
-                                />
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t-2 border-stone-300 font-semibold text-stone-800">
-                          <td className="pt-2">合計</td>
-                          <td className="pt-2 text-right pr-2">{totalQty}</td>
-                          <td className="pt-2 text-right pr-2">{yen(totalAmount)}</td>
-                          {hasCostData && <td />}
-                          <td className="pt-2 text-right">100%</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {dashTab === 'prep' && (
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <label className="text-sm text-stone-700 shrink-0">目標人数</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={targetInput}
-                  onChange={(e) => setTargetInput(e.target.value)}
-                  placeholder="20"
-                  className="w-24 border border-stone-300 rounded-lg px-3 py-2 text-lg text-right"
-                />
-                <span className="text-stone-500">人</span>
-              </div>
-
-              {prepCalc == null ? (
-                <p className="text-center text-stone-400 text-sm py-8">営業データがありません</p>
-              ) : (
-                <>
-                  {!prepCalc.sufficient && (
-                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
-                      ※ データが少ないため参考値です（3回以上の営業データが必要）
-                    </p>
-                  )}
-                  <p className="text-xs text-stone-500 mb-2">過去 {eventDates.length} 回の 1{prepCalc.unit} あたり平均より推定</p>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-stone-200 text-stone-500 text-xs">
-                          <th className="text-left pb-2">商品名</th>
-                          <th className="text-right pb-2 pr-2">平均（1{prepCalc.unit}）</th>
-                          {target > 0 && <th className="text-right pb-2">目標 {target} 人分</th>}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {prepCalc.items.map((item) => (
-                          <tr key={item.name} className="border-b border-stone-100">
-                            <td className="py-2 pr-2 font-medium text-stone-800 truncate max-w-36">{item.name}</td>
-                            <td className="py-2 pr-2 text-right text-stone-600">{item.avg.toFixed(2)} 食</td>
-                            {target > 0 && (
-                              <td className="py-2 text-right font-bold text-amber-800 text-base">{Math.ceil(item.avg * target)} 食</td>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {target === 0 && <p className="text-xs text-stone-400 mt-3 text-center">目標人数を入力すると推定量を表示します</p>}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
         </>
       )}
 

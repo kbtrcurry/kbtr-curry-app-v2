@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import {
   ShoppingCart,
-  ChefHat,
   Wallet,
   BarChart3,
   Carrot,
@@ -36,10 +35,9 @@ const queryClient = new QueryClient({
 
 type NavItem = { to: string; label: string; icon: LucideIcon }
 
-// デスクトップのサイドバーは全項目を表示。モバイルのボトムナビは頻度の高い5件のみ（残りは設定タブ内のハブから）
+// デスクトップのサイドバーは全項目を表示。モバイルのボトムナビは頻度の高いものだけ（残りは設定タブ内のハブから）
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'レジ', icon: ShoppingCart },
-  { to: '/prep', label: '仕込み', icon: ChefHat },
   { to: '/accounting', label: '会計', icon: Wallet },
   { to: '/dashboard', label: '分析', icon: BarChart3 },
   { to: '/ingredients', label: '食材', icon: Carrot },
@@ -48,7 +46,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/tax', label: '申告', icon: Receipt },
   { to: '/setup', label: '設定', icon: Settings },
 ]
-const BOTTOM_NAV_PATHS = new Set(['/', '/prep', '/accounting', '/dashboard', '/setup'])
+const BOTTOM_NAV_PATHS = new Set(['/', '/accounting', '/dashboard', '/setup'])
 const BOTTOM_NAV = NAV_ITEMS.filter((item) => BOTTOM_NAV_PATHS.has(item.to))
 
 function UpdateButton() {

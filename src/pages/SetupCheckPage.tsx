@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Carrot, BookOpen, UtensilsCrossed, Receipt, ChevronRight, Settings } from 'lucide-react'
+import { Carrot, BookOpen, UtensilsCrossed, Receipt, ChevronRight, Settings, ChefHat } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { usePersistedState } from '../lib/persistState'
@@ -17,6 +17,7 @@ const HUB_LINKS = [
   { to: '/ingredients', label: '食材', icon: Carrot },
   { to: '/recipes', label: 'レシピ', icon: BookOpen },
   { to: '/menus', label: 'メニュー', icon: UtensilsCrossed },
+  { to: '/prep', label: '仕込み', icon: ChefHat },
   { to: '/tax', label: '申告', icon: Receipt },
 ]
 
