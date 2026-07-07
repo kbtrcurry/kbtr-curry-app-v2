@@ -21,6 +21,7 @@ import {
 import {
   useAllRecipeIngredients,
   useAllMenuComponents,
+  useAllMenus,
   useRecipes,
   groupRecipeIngredientsByRecipe,
   menuCost,
@@ -63,7 +64,9 @@ export default function DashboardPage() {
   const { data: allRecipeIngredients = [] } = useAllRecipeIngredients()
   const { data: menuComponents = [] } = useAllMenuComponents()
   const { data: recipes = [] } = useRecipes()
+  const { data: allMenus = [] } = useAllMenus()
   const queryClient = useQueryClient()
+  const menuIdByName = useMemo(() => new Map(allMenus.map((m) => [m.name, m.id])), [allMenus])
 
   const [dashTab, setDashTab] = useState<DashTab>('summary')
   const [sumPeriod, setSumPeriod] = useState<SumPeriod>('month')
@@ -153,7 +156,15 @@ export default function DashboardPage() {
     setBusy(true)
     try {
       const editLines: EditableLine[] = menuEditRows
-        .map((r) => ({ name: r.name.trim(), qty: Number(r.qty) || 0, unitPrice: Number(r.price) || 0 }))
+        .map((r) => {
+          const name = r.name.trim()
+          return {
+            name,
+            qty: Number(r.qty) || 0,
+            unitPrice: Number(r.price) || 0,
+            menuId: menuIdByName.get(name) ?? null,
+          }
+        })
         .filter((l) => l.name && l.qty > 0)
       await replaceSessionLines({ id: s.id, people: s.people }, editLines)
       await invalidateAnalytics()
@@ -768,11 +779,20 @@ export default function DashboardPage() {
             <Modal onClose={() => setMenuEditId(null)}>
               <div className="bg-white w-full max-w-lg rounded-2xl p-5 space-y-3 overflow-y-auto max-h-[90svh]">
                 <h2 className="text-lg font-bold text-stone-900">{s.session_date} のメニュー別を編集</h2>
+                <p className="text-xs text-stone-400 -mt-2">
+                  メニュー名は登録済みのものと完全一致させると原価も自動計算されます
+                </p>
+                <datalist id="dash-menu-names">
+                  {allMenus.map((m) => (
+                    <option key={m.id} value={m.name} />
+                  ))}
+                </datalist>
                 <div className="space-y-1.5">
                   {menuEditRows.map((m, i) => (
                     <div key={i} className="flex items-center gap-1.5">
                       <input
                         type="text"
+                        list="dash-menu-names"
                         value={m.name}
                         onChange={(e) =>
                           setMenuEditRows((arr) => arr.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))

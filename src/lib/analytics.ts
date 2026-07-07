@@ -96,7 +96,7 @@ export async function deleteSessionCascade(sessionId: string): Promise<void> {
   if (sErr) throw sErr
 }
 
-export type EditableLine = { name: string; qty: number; unitPrice: number }
+export type EditableLine = { name: string; qty: number; unitPrice: number; menuId: string | null }
 
 // その日の会計内容(レシート・明細)を1件の修正レシートに作り直す。
 // session側の他項目(場所代・組数・メモ等)には触れない。
@@ -131,7 +131,7 @@ export async function replaceSessionLines(
   const { error: insLErr } = await supabase.from('receipt_lines').insert(
     valid.map((l) => ({
       receipt_id: receiptId,
-      menu_id: null,
+      menu_id: l.menuId,
       name_snapshot: l.name,
       qty: l.qty,
       unit_price: l.unitPrice,
