@@ -3,8 +3,10 @@ import { useAuth } from '../lib/auth'
 import { useRegisterBack } from '../lib/backHandler'
 import { Spinner } from '../components/Spinner'
 import { ConfirmModal } from '../components/ConfirmModal'
-import { BookOpen, Pencil, Trash2 } from 'lucide-react'
+import { Modal } from '../components/Modal'
+import { BookOpen, Pencil, Trash2, ClipboardPaste, AlertTriangle } from 'lucide-react'
 import { useIngredients } from '../lib/masterData'
+import { parseRecipeText, type ParsedIngredient } from '../lib/recipeImport'
 import { getRecent, pushRecent, RECENT_KEYS, RECENT_LABEL } from '../lib/recent'
 import { usePersistedState } from '../lib/persistState'
 import {
@@ -17,6 +19,7 @@ import {
   addRecipeIngredient,
   updateRecipeIngredient,
   deleteRecipeIngredient,
+  createRecipeWithIngredients,
   recipeTotalCost,
   effectiveServings,
   perServingCost,
@@ -62,6 +65,19 @@ export default function RecipesPage() {
   const [pickerSearch, setPickerSearch] = useState('')
   const [confirmDeleteRecipe, setConfirmDeleteRecipe] = useState(false)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState<RecipeIngredientRow | null>(null)
+
+  // メモからの取り込み
+  const [importOpen, setImportOpen] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [importDraft, setImportDraft] = useState<{
+    name: string
+    dishType: string
+    yieldG: string
+    servings: string
+    rows: ParsedIngredient[]
+  } | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const [salePrice, setSalePrice] = useState('')
   const [totalWeight, setTotalWeight] = useState('')
@@ -113,6 +129,71 @@ export default function RecipesPage() {
       setServings('')
     } catch (e) {
       setError(e instanceof Error ? e.message : '作成に失敗しました')
+    }
+  }
+
+  const analyzeImport = () => {
+    const parsed = parseRecipeText(importText)
+    if (!parsed.name) {
+      setError('レシピ名が読み取れませんでした（1行目にレシピ名を入れてください）')
+      return
+    }
+    setError(null)
+    setImportDraft({
+      name: parsed.name,
+      dishType: parsed.dishType,
+      yieldG: str(parsed.yieldG),
+      servings: '',
+      rows: parsed.ingredients,
+    })
+  }
+
+  const closeImport = () => {
+    setImportOpen(false)
+    setImportText('')
+    setImportDraft(null)
+  }
+
+  const runImport = async () => {
+    if (!importDraft) return
+    const nm = importDraft.name.trim()
+    if (!nm) return
+    if (recipes.some((r) => r.name === nm)) {
+      setError('同名のレシピが既にあります')
+      return
+    }
+    // 数量が読み取れなかった行は登録しない（画面上で警告表示済み）
+    const rows = importDraft.rows
+      .filter((r) => r.name.trim() && r.quantity != null)
+      .map((r) => ({ name: r.name.trim(), quantity: r.quantity as number, unit: r.unit, memo: r.memo }))
+
+    setImporting(true)
+    setError(null)
+    try {
+      const { recipeId, createdIngredientNames } = await createRecipeWithIngredients({
+        name: nm,
+        dishType: importDraft.dishType,
+        yieldG: num(importDraft.yieldG),
+        servings: num(importDraft.servings),
+        ingredients: rows,
+      })
+      invalidate()
+      closeImport()
+      setNotice(
+        createdIngredientNames.length > 0
+          ? `登録しました。新しく作成した食材 ${createdIngredientNames.length} 件は単価未設定です（食材タブで入力してください）`
+          : '登録しました',
+      )
+      setRecent(pushRecent(RECENT_KEYS.recipe, nm))
+      setSelectedId(recipeId)
+      setSalePrice('')
+      setTotalWeight(importDraft.yieldG)
+      setServingWeight('')
+      setServings(importDraft.servings)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '取り込みに失敗しました')
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -287,6 +368,15 @@ export default function RecipesPage() {
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{error}</div>
       )}
 
+      {notice && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm flex items-start gap-2">
+          <span className="flex-1">{notice}</span>
+          <button onClick={() => setNotice(null)} className="text-amber-600 shrink-0" aria-label="閉じる">
+            ×
+          </button>
+        </div>
+      )}
+
       {(recipesLoading || (selectedId && itemsLoading)) && <Spinner />}
 
       {!selectedId && !recipesLoading && (
@@ -309,6 +399,19 @@ export default function RecipesPage() {
               ＋新規
             </button>
           </div>
+
+          <button
+            onClick={() => {
+              setImportOpen(true)
+              setImportText('')
+              setImportDraft(null)
+              setError(null)
+              setNotice(null)
+            }}
+            className="w-full mb-3 border border-dashed border-amber-300 rounded-lg py-2.5 text-sm text-amber-700 font-semibold active:bg-stone-50 flex items-center justify-center gap-1.5"
+          >
+            <ClipboardPaste className="w-4 h-4" /> メモから貼り付けて登録
+          </button>
 
           {creating && (
             <div className="border border-amber-200 bg-amber-50/50 rounded-lg p-3 mb-3 space-y-2">
@@ -609,6 +712,190 @@ export default function RecipesPage() {
           }}
           onCancel={() => setConfirmDeleteItem(null)}
         />
+      )}
+
+      {importOpen && (
+        <Modal onClose={closeImport}>
+          <div className="bg-white w-full max-w-lg rounded-2xl p-5 space-y-3 overflow-y-auto max-h-[90svh]">
+            <h2 className="text-lg font-bold text-stone-900">メモから貼り付けて登録</h2>
+
+            {!importDraft ? (
+              <>
+                <p className="text-xs text-stone-500">
+                  メモアプリのレシピをそのまま貼り付けてください。1行目をレシピ名、「◯◯100g」のような行を食材として読み取ります。
+                </p>
+                <textarea
+                  autoFocus
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder={'チキンビリヤニ\n\n◆材料◆\n玉ねぎ200g\n鶏もも肉700g\n…\n仕上がり量2060g'}
+                  rows={12}
+                  className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm font-mono"
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={closeImport}
+                    className="flex-1 py-3 rounded-xl border border-stone-300 text-stone-600 font-semibold"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={analyzeImport}
+                    disabled={!importText.trim()}
+                    className="flex-1 py-3 rounded-xl bg-amber-700 text-[#faf9f5] font-bold disabled:opacity-40"
+                  >
+                    読み取る
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-stone-500">
+                  読み取り結果を確認してください。数量が読めなかった行（⚠）は登録されません。行は削除・修正できます。
+                </p>
+
+                <div>
+                  <label className="block text-xs text-stone-500 mb-1">レシピ名</label>
+                  <input
+                    type="text"
+                    value={importDraft.name}
+                    onChange={(e) => setImportDraft((d) => (d ? { ...d, name: e.target.value } : d))}
+                    className="w-full border border-stone-300 rounded-lg px-3 py-2 font-semibold"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-xs text-stone-500 mb-1">種別</label>
+                    <select
+                      value={importDraft.dishType}
+                      onChange={(e) => setImportDraft((d) => (d ? { ...d, dishType: e.target.value } : d))}
+                      className="w-full border border-stone-300 rounded-lg px-2 py-2 text-sm bg-white"
+                    >
+                      {RECIPE_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-stone-500 mb-1">総重量(g)</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={importDraft.yieldG}
+                      onChange={(e) => setImportDraft((d) => (d ? { ...d, yieldG: e.target.value } : d))}
+                      className="w-full border border-stone-300 rounded-lg px-2 py-2 text-right"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-stone-500 mb-1">食数</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={importDraft.servings}
+                      onChange={(e) => setImportDraft((d) => (d ? { ...d, servings: e.target.value } : d))}
+                      placeholder="任意"
+                      className="w-full border border-stone-300 rounded-lg px-2 py-2 text-right"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <p className="text-xs text-stone-500">
+                    食材 {importDraft.rows.filter((r) => r.quantity != null).length} 件
+                  </p>
+                  {importDraft.rows.map((row, i) => {
+                    const isNew = row.name.trim() !== '' && !allIngredients.some((ing) => ing.name === row.name.trim())
+                    return (
+                      <div key={i} className="flex items-center gap-1.5">
+                        {row.quantity == null ? (
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        ) : (
+                          <span className="w-3.5 shrink-0" />
+                        )}
+                        <input
+                          type="text"
+                          value={row.name}
+                          onChange={(e) =>
+                            setImportDraft((d) =>
+                              d
+                                ? { ...d, rows: d.rows.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) }
+                                : d,
+                            )
+                          }
+                          className="flex-1 min-w-0 border border-stone-300 rounded-lg px-2 py-1.5 text-sm"
+                        />
+                        {isNew && (
+                          <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 shrink-0">
+                            新規
+                          </span>
+                        )}
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          value={row.quantity ?? ''}
+                          onChange={(e) =>
+                            setImportDraft((d) =>
+                              d
+                                ? {
+                                    ...d,
+                                    rows: d.rows.map((x, j) =>
+                                      j === i ? { ...x, quantity: num(e.target.value) } : x,
+                                    ),
+                                  }
+                                : d,
+                            )
+                          }
+                          className="w-16 border border-stone-300 rounded-lg px-2 py-1.5 text-right text-sm"
+                        />
+                        <input
+                          type="text"
+                          value={row.unit}
+                          onChange={(e) =>
+                            setImportDraft((d) =>
+                              d
+                                ? { ...d, rows: d.rows.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)) }
+                                : d,
+                            )
+                          }
+                          className="w-10 border border-stone-300 rounded-lg px-1 py-1.5 text-center text-sm"
+                        />
+                        <button
+                          onClick={() =>
+                            setImportDraft((d) => (d ? { ...d, rows: d.rows.filter((_, j) => j !== i) } : d))
+                          }
+                          className="text-red-400 p-1 shrink-0"
+                          title="この行を除外"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="flex gap-3 pt-1">
+                  <button
+                    onClick={() => setImportDraft(null)}
+                    disabled={importing}
+                    className="flex-1 py-3 rounded-xl border border-stone-300 text-stone-600 font-semibold"
+                  >
+                    ← 戻る
+                  </button>
+                  <button
+                    onClick={() => void runImport()}
+                    disabled={importing || !importDraft.name.trim()}
+                    className="flex-1 py-3 rounded-xl bg-amber-700 text-[#faf9f5] font-bold disabled:opacity-40"
+                  >
+                    {importing ? '登録中...' : 'このレシピを登録'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </Modal>
       )}
     </div>
   )

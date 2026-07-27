@@ -233,6 +233,56 @@ export async function addRecipeIngredient(
   if (error) throw error
 }
 
+// メモからの一括登録用: レシピ本体・食材明細をまとめて作る。
+// マスタに無い食材は単価未設定のスタブとして自動作成する（後から食材タブで単価を入れる運用）。
+export type ImportedIngredient = { name: string; quantity: number; unit: string; memo?: string }
+
+export async function createRecipeWithIngredients(input: {
+  name: string
+  dishType: string
+  yieldG: number | null
+  servings: number | null
+  ingredients: ImportedIngredient[]
+}): Promise<{ recipeId: string; createdIngredientNames: string[] }> {
+  const existing = await fetchIngredients()
+  const idByName = new Map(existing.map((i) => [i.name, i.id]))
+
+  const missing = [...new Set(input.ingredients.map((i) => i.name).filter((n) => !idByName.has(n)))]
+  const createdIngredientNames: string[] = []
+  if (missing.length > 0) {
+    const { data, error } = await supabase
+      .from('ingredients')
+      .insert(missing.map((name) => ({ name, memo: 'レシピ取り込み時に自動作成（単価未設定）' })))
+      .select('id, name')
+    if (error) throw error
+    for (const row of data ?? []) {
+      idByName.set(row.name, row.id)
+      createdIngredientNames.push(row.name)
+    }
+  }
+
+  const recipeId = await createRecipe(input.name, input.dishType)
+  if (input.yieldG != null || input.servings != null) {
+    await updateRecipe(recipeId, { yield_g: input.yieldG, servings: input.servings })
+  }
+
+  const rows = input.ingredients
+    .map((i) => ({
+      recipe_id: recipeId,
+      ingredient_id: idByName.get(i.name),
+      quantity: i.quantity,
+      unit: i.unit || 'g',
+      memo: i.memo ?? '',
+    }))
+    .filter((r): r is typeof r & { ingredient_id: string } => !!r.ingredient_id)
+  if (rows.length > 0) {
+    const { error } = await supabase.from('recipe_ingredients').insert(rows)
+    if (error) throw error
+  }
+
+  return { recipeId, createdIngredientNames }
+}
+
 export async function updateRecipeIngredient(
   id: string,
   patch: Partial<Pick<RecipeIngredientRow, 'quantity' | 'unit' | 'memo'>>,
